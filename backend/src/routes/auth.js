@@ -1,0 +1,29 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../../config/database');
+
+// Login
+router.post('/login', (req, res) => {
+  const { email, password } = req.body;
+  
+  db.get('SELECT * FROM usuarios WHERE usuario = ?', [email], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
+    if (user.contrasena !== password) return res.status(401).json({ error: 'Credenciales inválidas' });
+    
+    // En una app real usarías JWT, pero para simplificar:
+    const token = `token-${user.id}-${Date.now()}`;
+    
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        rol: user.rol,
+        usuario: user.usuario
+      }
+    });
+  });
+});
+
+module.exports = router;
