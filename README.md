@@ -1,91 +1,131 @@
-# Taquería App
+# 🌮 Sistema de Gestión de Taquería
 
-Sistema de gestión para cadena de taquerías con interfaz de meseros y panel administrativo.
+Sistema gráfico e intuitivo para tablets que permite a meseros y administradores gestionar el flujo de trabajo en una taquería: desde el control de mesas y órdenes, hasta el inventario y reportes de ventas.
 
-## 🎯 Objetivo
+## 🧠 Objetivo General
 
-Desarrollar una aplicación web local para optimizar el funcionamiento de una cadena de taquerías, enfocándose en dos áreas principales:
-1. **Interfaz de meseros (Tablets):** Toma de pedidos, control de mesas y cuentas.
-2. **Panel administrativo:** Control de inventario, precios, platillos, bebidas, asignación de meseros y reportes.
+Desarrollar un sistema gráfico y responsivo para la gestión operativa y administrativa de una taquería, facilitando el trabajo de meseros y administradores a través de una interfaz moderna, ágil y eficiente.
 
-## 🛠️ Tecnologías Utilizadas
+## 🎯 Objetivos Específicos
 
-- **Frontend:**
-  - React.js
-  - Tailwind CSS
-  - React Router
-- **Base de Datos:**
-  - SQLite
-- **Herramientas de Desarrollo:**
-  - Node.js
-  - npm
-  - Git
+- Controlar el estado de las mesas en tiempo real.
+- Registrar y modificar órdenes por mesa.
+- Calcular totales de consumo y dividir cuentas.
+- Administrar inventario de productos y platillos.
+- Asignar mesas y meseros dinámicamente.
+- Generar reportes de ventas y productos más vendidos.
+
+---
+
+## 🧱 Stack Tecnológico
+
+| Componente | Tecnología |
+|-----------|------------|
+| **Frontend** | React + Tailwind CSS |
+| **Backend**  | Node.js + Express |
+| **Base de Datos** | SQLite (LiteSQL) |
+| **Lenguaje** | JavaScript |
+| **Control de versiones** | Git + GitHub |
+| **Diseño UI/UX** | Figma |
+| **Hosting** | Localhost (modo desarrollo) |
+
+---
 
 ## 📁 Estructura del Proyecto
 
 ```
-/taqueria-app
-├── /frontend
-│   ├── /components (Componentes reutilizables)
-│   ├── /pages (Vistas principales)
-│   ├── /styles (Estilos y configuraciones CSS)
-│   └── App.jsx (Punto de entrada)
-├── /data
-│   └── database.db (Base de datos SQLite)
-├── /design
-│   └── figma-files/ (Diseños y mockups)
-├── README.md
-└── package.json
+taqueria-app/
+├── frontend/           # Interfaz de usuario (React + Tailwind)
+│   └── src/
+│       ├── components/ # Elementos reutilizables (Botones, Tablas, etc.)
+│       ├── pages/      # Vistas (Login, Mesas, Órdenes)
+│       ├── services/   # Comunicación con API (Axios/Fetch)
+│       └── hooks/      # Lógica personalizada para UI
+│
+├── backend/            # Lógica del servidor (Node.js + Express)
+│   └── src/
+│       ├── controllers/ # Lógica de negocio (manejo de órdenes, productos)
+│       ├── models/      # Definición de estructuras de datos
+│       ├── routes/      # Endpoints de la API
+│       └── middleware/  # Autenticación, validaciones, logs
+│
+└── database/           # Base de datos SQLite
+    ├── migrations/     # Scripts para crear/modificar tablas
+    └── seeds/          # Datos de prueba para desarrollo
 ```
 
-## 🚀 Requisitos
+---
 
-- Node.js (v14 o superior)
-- npm o yarn
-- SQLite
+## 📋 Tabla de Requerimientos
 
-## 💻 Instalación
+| Categoría         | Requerimiento                                                  |
+|-------------------|----------------------------------------------------------------|
+| Mesas             | Visualizar estado, asignar mesero, liberar                     |
+| Órdenes           | Crear, modificar, eliminar, cerrar                             |
+| Productos         | Ver catálogo, precios, disponibilidad                          |
+| Inventario        | Control de existencias, modificación por orden                 |
+| Reportes          | Ventas diarias, productos más vendidos                         |
+| Autenticación     | Login por usuario y tipo (mesero/admin)                        |
+| UX/UI             | Responsivo, rápido, intuitivo                                  |
+| Base de datos     | Persistencia de mesas, órdenes, productos, usuarios            |
 
-1. Clonar el repositorio:
-   ```bash
-   git clone [URL_DEL_REPOSITORIO]
-   cd taqueria-app
-   ```
+---
 
-2. Instalar dependencias:
-   ```bash
-   npm install
-   ```
+## 🖥️ Módulos Frontend por Implementar
 
-3. Iniciar la aplicación:
-   ```bash
-   npm start
-   ```
+- [ ] Login y Logout
+- [ ] Dashboard de mesas
+- [ ] Creación y edición de órdenes
+- [ ] Control de inventario y productos
+- [ ] Vista de reportes
+- [ ] Gestión de usuarios y roles
 
-## 📝 Guía de Desarrollo
+---
 
-1. **Configuración del Entorno**
-   - Instalar Node.js
-   - Clonar el repositorio
-   - Instalar dependencias
+## 📡 API REST (Backend)
 
-2. **Estructura de Código**
-   - Componentes en `/frontend/components`
-   - Páginas en `/frontend/pages`
-   - Estilos en `/frontend/styles`
+Ejemplos de endpoints que se incluirán:
 
-3. **Base de Datos**
-   - Archivo SQLite en `/data/database.db`
-   - Esquema definido en `/data/database.js`
+```http
+GET    /mesas            → Obtener estado de todas las mesas
+POST   /ordenes          → Crear nueva orden
+PUT    /ordenes/:id      → Modificar orden existente
+GET    /productos        → Listar catálogo de productos
+PUT    /inventario/:id   → Actualizar existencia
+GET    /reportes/ventas  → Consultar ventas del día
+```
 
-## 🤝 Contribución
+---
 
-1. Hacer fork del proyecto
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
+## 🧪 Ejecución en Local
 
-## 📄 Licencia
+### Frontend
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+---
+
+## 🧑‍💻 Autor
+
+Moisés Pérez Aello  
+Proyecto académico para la materia de Sistemas de Información
+
+---
+
+## 🧠 Notas Finales
+
+- Este sistema está pensado para ejecutarse localmente (modo desarrollo).
+- El enfoque es educativo, pero la arquitectura está lista para escalar.
+- El diseño y flujo de trabajo han sido pensados para ser simples, prácticos y realistas.
