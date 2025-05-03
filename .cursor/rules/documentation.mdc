@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+name: Generate function docs
+description: Genera documentación para cada función pública del archivo.
+trigger: manual
+run: |
+  Para cada función pública, genera una breve descripción, parámetros y valor de retorno.
+
