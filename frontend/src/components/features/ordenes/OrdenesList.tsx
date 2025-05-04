@@ -1,54 +1,59 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-
-interface Producto {
-  id: number;
-  nombre: string;
-  precio: number;
-  cantidad: number;
-}
-
-interface Mesa {
-  id: number;
-  numero: number;
-}
-
-interface Usuario {
-  id: number;
-  nombre: string;
-}
+import { useAuth } from '../../../context/AuthContext';
 
 interface Orden {
   id: number;
-  mesa: Mesa;
-  usuario: Usuario;
-  total: number;
-  productos: Producto[];
+  mesa: {
+    numero: number;
+  };
+  mesero: string;
+  total: string;
+  productos: number;
+  hora: string;
+  estado: string;
+  metodo_pago?: string;
+  notas?: string;
+  fecha_creacion: string;
+  fecha_cierre?: string;
 }
 
 const OrdenesList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
+  const { token } = useAuth();
 
   const cargarOrdenes = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/ordenes/activas');
+      // Mostrar el estado de carga
+      setLoading(true);
+      
+      const response = await fetch('http://localhost:3000/api/ordenes', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
       if (!response.ok) {
         throw new Error('Error al cargar las órdenes');
       }
+
       const data = await response.json();
+      console.log('Órdenes cargadas:', data);
       setOrdenes(data);
     } catch (err) {
+      console.error('Error detallado:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
   };
 
+  // Cargar órdenes cuando el componente se monta
   React.useEffect(() => {
     cargarOrdenes();
-  }, []);
+  }, [token]); // Agregamos token como dependencia
 
   const handleCerrarOrden = async (id: number) => {
     try {
@@ -102,10 +107,17 @@ const OrdenesList: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold">Orden #{orden.id}</h2>
                   <p>Mesa: {orden.mesa.numero}</p>
-                  <p>Mesero: {orden.usuario.nombre}</p>
+                  <p>Mesero: {orden.mesero}</p>
+                  <p>Productos: {orden.productos}</p>
+                  <p>Hora: {orden.hora}</p>
+                  {orden.notas && <p>Notas: {orden.notas}</p>}
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold">Total: ${orden.total}</p>
+                  <p className="text-sm text-gray-600">{orden.estado}</p>
+                  {orden.metodo_pago && (
+                    <p className="text-sm text-gray-600">Pago: {orden.metodo_pago}</p>
+                  )}
                   <div className="mt-2 space-x-2">
                     <button
                       onClick={() => handleCerrarOrden(orden.id)}
@@ -122,16 +134,6 @@ const OrdenesList: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="mt-4">
-                <h3 className="font-semibold">Productos:</h3>
-                <ul className="list-disc list-inside">
-                  {orden.productos.map((producto) => (
-                    <li key={producto.id}>
-                      {producto.cantidad}x {producto.nombre} - ${producto.precio}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
           ))}
         </div>
@@ -140,4 +142,4 @@ const OrdenesList: React.FC = () => {
   );
 };
 
-export default OrdenesList; 
+export default OrdenesList;

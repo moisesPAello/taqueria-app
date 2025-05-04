@@ -1,0 +1,9 @@
+{
+  "name": "db-playground",
+  "version": "1.0.0",
+  "description": "SQLite database playground for Taqueria App",
+  "main": "db_playground.js",
+  "dependencies": {
+    "sqlite3": "^5.1.6"
+  }
+}

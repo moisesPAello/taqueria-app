@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ProductoCard from './ProductoCard';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 
 interface Producto {
   id: number;
@@ -34,8 +34,8 @@ const ProductosList: React.FC = () => {
       const data = await response.json();
       setProductos(data);
       
-      // Extraer categorías únicas
-      const categoriasUnicas = [...new Set(data.map((p: Producto) => p.categoria))];
+      // Extraer categorías únicas con aserción de tipo
+      const categoriasUnicas = [...new Set(data.map((p: Producto) => p.categoria))] as string[];
       setCategorias(categoriasUnicas);
     } catch (err) {
       setError('Error al cargar los productos');
@@ -135,4 +135,4 @@ const ProductosList: React.FC = () => {
   );
 };
 
-export default ProductosList; 
+export default ProductosList;

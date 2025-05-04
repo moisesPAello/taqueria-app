@@ -21,6 +21,10 @@ const Login: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
+        const { useAuth } = require('../../context/AuthContext');
+        const { login } = useAuth();
+        login(data.token, data.user);
+
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         navigate('/dashboard');
@@ -93,4 +97,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login; 
+export default Login;

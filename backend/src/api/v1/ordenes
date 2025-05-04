@@ -1,0 +1,158 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../../../config/database');
+
+// Obtener órdenes activas
+router.get('/', (req, res) => {
+    const query = `
+        SELECT 
+            o.id,
+            o.total,
+            o.estado,
+            o.fecha_creacion as hora,
+            json_object('numero', m.numero) as mesa,
+            u.nombre as mesero,
+            COUNT(d.id) as productos
+        FROM ordenes o
+        LEFT JOIN mesas m ON o.mesa_id = m.id
+        LEFT JOIN usuarios u ON o.usuario_id = u.id
+        LEFT JOIN detalles_orden d ON o.id = d.orden_id
+        WHERE o.estado = 'activa'
+        GROUP BY o.id
+    `;
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('Error en la consulta:', err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        // Log para debug
+        console.log('Órdenes encontradas:', rows);
+
+        const formattedRows = rows.map(row => ({
+            ...row,
+            hora: new Date(row.hora).toLocaleTimeString(),
+            total: parseFloat(row.total).toFixed(2),
+            mesa: JSON.parse(row.mesa)
+        }));
+
+        res.json(formattedRows);
+    });
+});
+
+// Añadir ruta para obtener detalles de una orden específica
+router.get('/:id', (req, res) => {
+    const { id } = req.params;
+    
+    const query = `
+        SELECT 
+            o.*,
+            m.numero as mesa_numero,
+            u.nombre as mesero_nombre,
+            json_group_array(
+                json_object(
+                    'id', p.id,
+                    'nombre', p.nombre,
+                    'precio', d.precio_unitario,
+                    'cantidad', d.cantidad
+                )
+            ) as productos
+        FROM ordenes o
+        LEFT JOIN mesas m ON o.mesa_id = m.id
+        LEFT JOIN usuarios u ON o.usuario_id = u.id
+        LEFT JOIN detalles_orden d ON o.id = d.orden_id
+        LEFT JOIN productos p ON d.producto_id = p.id
+        WHERE o.id = ?
+        GROUP BY o.id
+    `;
+
+    db.get(query, [id], (err, orden) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        if (!orden) {
+            res.status(404).json({ error: 'Orden no encontrada' });
+            return;
+        }
+
+        // Parsear el array de productos que viene como string
+        orden.productos = JSON.parse(orden.productos);
+        
+        res.json(orden);
+    });
+});
+
+// Crear nueva orden
+router.post('/', (req, res) => {
+    const { mesa_id, usuario_id, productos } = req.body;
+    
+    db.serialize(() => {
+        // 1. Iniciar transacción
+        db.run('BEGIN TRANSACTION');
+        
+        try {
+            // 2. Crear la orden
+            db.run(
+                'INSERT INTO ordenes (mesa_id, usuario_id, estado, total) VALUES (?, ?, "activa", 0)',
+                [mesa_id, usuario_id],
+                function(err) {
+                    if (err) {
+                        db.run('ROLLBACK');
+                        return res.status(500).json({ error: err.message });
+                    }
+                    
+                    const orden_id = this.lastID;
+                    
+                    // 3. Insertar los productos
+                    const stmt = db.prepare(`
+                        INSERT INTO detalles_orden (
+                            orden_id, producto_id, cantidad, precio_unitario
+                        ) VALUES (?, ?, ?, (
+                            SELECT precio FROM productos WHERE id = ?
+                        ))
+                    `);
+                    
+                    productos.forEach(prod => {
+                        stmt.run([orden_id, prod.producto_id, prod.cantidad, prod.producto_id]);
+                    });
+                    
+                    stmt.finalize();
+                    
+                    // 4. Actualizar el total de la orden
+                    db.run(`
+                        UPDATE ordenes 
+                        SET total = (
+                            SELECT SUM(cantidad * precio_unitario) 
+                            FROM detalles_orden 
+                            WHERE orden_id = ?
+                        )
+                        WHERE id = ?
+                    `, [orden_id, orden_id]);
+                    
+                    // 5. Actualizar estado de la mesa
+                    db.run(
+                        'UPDATE mesas SET estado = "ocupada" WHERE id = ?',
+                        [mesa_id]
+                    );
+                    
+                    // 6. Confirmar transacción
+                    db.run('COMMIT');
+                    
+                    res.json({ 
+                        message: 'Orden creada exitosamente',
+                        orden_id 
+                    });
+                }
+            );
+        } catch (err) {
+            db.run('ROLLBACK');
+            res.status(500).json({ error: err.message });
+        }
+    });
+});
+
+module.exports = router;

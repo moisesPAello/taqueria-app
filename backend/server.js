@@ -7,10 +7,10 @@ const cors = require('cors');
 const db = require('./config/database');
 
 // Importar rutas
-const mesasRoutes = require('./src/routes/mesas');
-const productosRoutes = require('./src/routes/productos');
-const ordenesRoutes = require('./src/routes/ordenes');
-const authRoutes = require('./src/routes/auth');
+const mesasRoutes = require('./src/api/v1/mesas');
+const productosRoutes = require('./src/api/v1/productos');
+const ordenesRoutes = require('./src/api/v1/ordenes');
+const authRoutes = require('./src/api/v1/auth');
 
 const app = express();
 const PORT = 3000;

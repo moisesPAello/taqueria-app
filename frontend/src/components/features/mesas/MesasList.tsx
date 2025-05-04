@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MesaCard from './MesaCard';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 
 interface Mesa {
   id: number;
@@ -136,4 +136,4 @@ const MesasList: React.FC = () => {
   );
 };
 
-export default MesasList; 
+export default MesasList;

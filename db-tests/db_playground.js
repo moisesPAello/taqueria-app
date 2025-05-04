@@ -1,6 +1,15 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const readline = require('readline');
+const fs = require('fs');
+const dirs = ['../exports', '../database/backups'];
+
+dirs.forEach(dir => {
+    const fullPath = path.join(__dirname, dir);
+    if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true });
+    }
+});
 
 // Configuración de la base de datos
 const dbPath = path.join(__dirname, '../database/database.db');
@@ -15,6 +24,26 @@ const rl = readline.createInterface({
 // Funciones auxiliares
 const question = (prompt) => new Promise((resolve) => rl.question(prompt, resolve));
 const pressEnterToContinue = () => question('\nPresiona Enter para continuar...');
+
+// Agregar después de las funciones auxiliares
+const handleError = (err, message = 'Error en operación') => {
+    console.error(`${message}:`, err.message);
+    return pressEnterToContinue();
+};
+
+// Agregar después del wrapper de error
+const validateTableName = async (tableName) => {
+    return new Promise((resolve, reject) => {
+        db.get(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+            [tableName],
+            (err, row) => {
+                if (err) reject(err);
+                resolve(row ? true : false);
+            }
+        );
+    });
+};
 
 // Menú principal
 const mainMenu = async () => {
@@ -210,11 +239,52 @@ async function showTableData() {
     db.all(query, [], (err, rows) => {
         if (err) {
             console.error('Error:', err.message);
-        } else {
-            console.log('\nRegistros encontrados:');
-            console.table(rows);
+            return pressEnterToContinue();
         }
-        pressEnterToContinue();
+
+        if (rows.length === 0) {
+            console.log('\nLa tabla está vacía');
+            return pressEnterToContinue();
+        }
+
+        // Obtener el ancho máximo para cada columna
+        const columns = Object.keys(rows[0]);
+        const widths = {};
+        
+        // Inicializar con el largo de los nombres de columna
+        columns.forEach(col => {
+            widths[col] = col.length;
+        });
+
+        // Encontrar el valor más largo para cada columna
+        rows.forEach(row => {
+            columns.forEach(col => {
+                const value = row[col]?.toString() || '';
+                widths[col] = Math.max(widths[col], value.length);
+            });
+        });
+
+        // Crear la línea separadora
+        const separator = '+' + columns.map(col => '-'.repeat(widths[col] + 2)).join('+') + '+';
+
+        // Imprimir encabezado
+        console.log('\n' + separator);
+        console.log('|' + columns.map(col => ` ${col.padEnd(widths[col])} `).join('|') + '|');
+        console.log(separator);
+
+        // Imprimir filas
+        rows.forEach(row => {
+            console.log('|' + columns.map(col => {
+                const value = row[col]?.toString() || '';
+                return ` ${value.padEnd(widths[col])} `;
+            }).join('|') + '|');
+        });
+
+        // Imprimir línea final
+        console.log(separator);
+        console.log(`\nTotal de registros: ${rows.length}`);
+        
+        return pressEnterToContinue();
     });
 }
 
@@ -408,7 +478,11 @@ async function backupDatabase() {
     });
 }
 
-// Implementación de importación/exportación CSV
+/**
+ * Exporta el contenido de una tabla a un archivo CSV
+ * @param {string} tableName - Nombre de la tabla a exportar
+ * @returns {Promise<void>}
+ */
 async function exportCSV() {
     const fs = require('fs');
     const tableName = await question('\nNombre de la tabla a exportar: ');
@@ -446,23 +520,63 @@ async function loadSampleData() {
     
     const sampleData = {
         productos: [
-            { nombre: 'Taco de Asada', precio: 25.00, descripcion: 'Taco tradicional de carne asada' },
-            { nombre: 'Taco de Pastor', precio: 20.00, descripcion: 'Taco de carne al pastor' },
-            // ... más productos
+            { nombre: 'Taco de Asada', precio: 25.00, descripcion: 'Taco tradicional de carne asada', categoria: 'tacos', disponible: 1 },
+            { nombre: 'Taco de Pastor', precio: 20.00, descripcion: 'Taco de carne al pastor marinada', categoria: 'tacos', disponible: 1 },
+            { nombre: 'Taco de Pollo', precio: 22.00, descripcion: 'Taco de pollo asado', categoria: 'tacos', disponible: 1 },
+            { nombre: 'Quesadilla', precio: 35.00, descripcion: 'Tortilla con queso fundido', categoria: 'quesadillas', disponible: 1 },
+            { nombre: 'Burrito de Asada', precio: 45.00, descripcion: 'Burrito grande de carne asada', categoria: 'burritos', disponible: 1 },
+            { nombre: 'Coca Cola', precio: 20.00, descripcion: 'Refresco 600ml', categoria: 'bebidas', disponible: 1 },
+            { nombre: 'Agua Fresca', precio: 15.00, descripcion: 'Agua de horchata/jamaica', categoria: 'bebidas', disponible: 1 }
         ],
         mesas: [
-            { numero: 1, capacidad: 4, estado: 'disponible' },
-            { numero: 2, capacidad: 6, estado: 'disponible' },
-            // ... más mesas
+            { numero: 1, capacidad: 4, estado: 'disponible', ubicacion: 'interior' },
+            { numero: 2, capacidad: 6, estado: 'disponible', ubicacion: 'interior' },
+            { numero: 3, capacidad: 2, estado: 'disponible', ubicacion: 'barra' },
+            { numero: 4, capacidad: 4, estado: 'disponible', ubicacion: 'terraza' },
+            { numero: 5, capacidad: 8, estado: 'disponible', ubicacion: 'terraza' }
         ],
         usuarios: [
-            { nombre: 'Admin', email: 'admin@taqueria.com', password: 'admin123', rol: 'admin' },
-            { nombre: 'Mesero', email: 'mesero@taqueria.com', password: 'mesero123', rol: 'mesero' },
-            // ... más usuarios
+            { 
+                nombre: 'Administrador', 
+                usuario: 'admin@taqueria.com', 
+                contrasena: 'admin123', 
+                rol: 'admin',
+                estado: 'activo'
+            },
+            { 
+                nombre: 'Juan Mesero', 
+                usuario: 'juan@taqueria.com', 
+                contrasena: 'juan123', 
+                rol: 'mesero',
+                estado: 'activo'
+            },
+            { 
+                nombre: 'Ana Mesera', 
+                usuario: 'ana@taqueria.com', 
+                contrasena: 'ana123', 
+                rol: 'mesero',
+                estado: 'activo'
+            },
+            { 
+                nombre: 'Pedro Cocinero', 
+                usuario: 'pedro@taqueria.com', 
+                contrasena: 'pedro123', 
+                rol: 'cocinero',
+                estado: 'activo'
+            }
         ]
     };
 
     try {
+        // Primero truncamos las tablas para evitar duplicados
+        for (const table of Object.keys(sampleData)) {
+            await new Promise((resolve, reject) => {
+                db.run(`DELETE FROM ${table}`, err => err ? reject(err) : resolve());
+            });
+            console.log(`✓ Tabla ${table} limpiada`);
+        }
+
+        // Luego insertamos los nuevos datos
         for (const [table, data] of Object.entries(sampleData)) {
             for (const item of data) {
                 const columns = Object.keys(item).join(', ');
@@ -477,7 +591,7 @@ async function loadSampleData() {
                     );
                 });
             }
-            console.log(`✓ Datos cargados en tabla: ${table}`);
+            console.log(`✓ ${data.length} registros cargados en tabla: ${table}`);
         }
         console.log('\nTodos los datos de ejemplo han sido cargados exitosamente.');
     } catch (err) {
@@ -490,272 +604,3 @@ async function loadSampleData() {
 // Inicio del programa
 console.log('Bienvenido al SQLite Database Playground');
 mainMenu();
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const readline = require('readline');
-
-// Ruta al archivo de la base de datos
-const dbPath = path.join(__dirname, 'database.db');
-
-// Crear una nueva instancia de la base de datos
-const db = new sqlite3.Database(dbPath);
-
-// Configurar readline para entrada de usuario
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
-
-// Función para mostrar el menú
-function showMenu() {
-    console.log('\n=== Menú de Pruebas de Base de Datos ===');
-    console.log('1. Ver todos los productos');
-    console.log('2. Ver todas las mesas');
-    console.log('3. Ver todos los usuarios');
-    console.log('4. Ver todas las órdenes activas');
-    console.log('5. Crear nueva orden');
-    console.log('6. Agregar producto a orden');
-    console.log('7. Ver detalles de una orden');
-    console.log('8. Ver logs de auditoría');
-    console.log('9. Salir');
-    console.log('----------------------------------------');
-}
-
-// Función para mostrar todos los productos
-function showProducts() {
-    db.all('SELECT * FROM productos', [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener productos:', err);
-            return;
-        }
-        console.log('\n=== Productos ===');
-        rows.forEach(row => {
-            console.log(`ID: ${row.id}`);
-            console.log(`Código: ${row.codigo || 'N/A'}`);
-            console.log(`Nombre: ${row.nombre}`);
-            console.log(`Descripción: ${row.descripcion || 'N/A'}`);
-            console.log(`Precio: $${row.precio}`);
-            console.log(`Categoría: ${row.categoria}`);
-            console.log(`Tiempo de preparación: ${row.tiempo_preparacion || 'N/A'} minutos`);
-            console.log(`Disponible: ${row.disponible ? 'Sí' : 'No'}`);
-            console.log('-------------------');
-        });
-        askOption();
-    });
-}
-
-// Función para mostrar todas las mesas
-function showMesas() {
-    db.all('SELECT * FROM mesas', [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener mesas:', err);
-            return;
-        }
-        console.log('\n=== Mesas ===');
-        rows.forEach(row => {
-            console.log(`ID: ${row.id}`);
-            console.log(`Número: ${row.numero}`);
-            console.log(`Capacidad: ${row.capacidad}`);
-            console.log(`Estado: ${row.estado}`);
-            console.log(`Ubicación: ${row.ubicacion || 'N/A'}`);
-            console.log(`Notas: ${row.notas || 'N/A'}`);
-            console.log('-------------------');
-        });
-        askOption();
-    });
-}
-
-// Función para mostrar todos los usuarios
-function showUsuarios() {
-    db.all('SELECT * FROM usuarios', [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener usuarios:', err);
-            return;
-        }
-        console.log('\n=== Usuarios ===');
-        rows.forEach(row => {
-            console.log(`ID: ${row.id}`);
-            console.log(`Nombre: ${row.nombre}`);
-            console.log(`Rol: ${row.rol}`);
-            console.log(`Usuario: ${row.usuario}`);
-            console.log(`Estado: ${row.estado}`);
-            console.log(`Último acceso: ${row.ultimo_acceso || 'N/A'}`);
-            console.log('-------------------');
-        });
-        askOption();
-    });
-}
-
-// Función para mostrar órdenes activas
-function showOrdenesActivas() {
-    const query = `
-        SELECT o.*, m.numero as mesa_numero, u.nombre as usuario_nombre
-        FROM ordenes o
-        JOIN mesas m ON o.mesa_id = m.id
-        JOIN usuarios u ON o.usuario_id = u.id
-        WHERE o.estado = 'activa'
-    `;
-    
-    db.all(query, [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener órdenes activas:', err);
-            return;
-        }
-        console.log('\n=== Órdenes Activas ===');
-        rows.forEach(row => {
-            console.log(`ID: ${row.id}`);
-            console.log(`Mesa: ${row.mesa_numero}`);
-            console.log(`Mesero: ${row.usuario_nombre}`);
-            console.log(`Total: $${row.total}`);
-            console.log(`Estado: ${row.estado}`);
-            console.log(`Fecha creación: ${row.fecha_creacion}`);
-            console.log('-------------------');
-        });
-        askOption();
-    });
-}
-
-// Función para crear una nueva orden
-function createNewOrder() {
-    rl.question('Número de mesa: ', (mesaNum) => {
-        rl.question('ID del usuario: ', (usuarioId) => {
-            db.run(
-                'INSERT INTO ordenes (mesa_id, usuario_id, creado_por) VALUES (?, ?, ?)',
-                [mesaNum, usuarioId, usuarioId],
-                function(err) {
-                    if (err) {
-                        console.error('Error al crear orden:', err);
-                    } else {
-                        console.log(`Orden creada con ID: ${this.lastID}`);
-                    }
-                    askOption();
-                }
-            );
-        });
-    });
-}
-
-// Función para agregar producto a una orden
-function addProductToOrder() {
-    rl.question('ID de la orden: ', (ordenId) => {
-        rl.question('ID del producto: ', (productoId) => {
-            rl.question('Cantidad: ', (cantidad) => {
-                db.get('SELECT precio FROM productos WHERE id = ?', [productoId], (err, producto) => {
-                    if (err) {
-                        console.error('Error al obtener precio:', err);
-                        askOption();
-                        return;
-                    }
-                    
-                    db.run(
-                        'INSERT INTO detalles_orden (orden_id, producto_id, cantidad, precio_unitario, creado_por) VALUES (?, ?, ?, ?, ?)',
-                        [ordenId, productoId, cantidad, producto.precio, 1],
-                        function(err) {
-                            if (err) {
-                                console.error('Error al agregar producto:', err);
-                            } else {
-                                console.log('Producto agregado exitosamente');
-                            }
-                            askOption();
-                        }
-                    );
-                });
-            });
-        });
-    });
-}
-
-// Función para ver detalles de una orden
-function showOrderDetails() {
-    rl.question('ID de la orden: ', (ordenId) => {
-        const query = `
-            SELECT do.*, p.nombre as producto_nombre
-            FROM detalles_orden do
-            JOIN productos p ON do.producto_id = p.id
-            WHERE do.orden_id = ?
-        `;
-        
-        db.all(query, [ordenId], (err, rows) => {
-            if (err) {
-                console.error('Error al obtener detalles:', err);
-                askOption();
-                return;
-            }
-            
-            console.log('\n=== Detalles de la Orden ===');
-            rows.forEach(row => {
-                console.log(`Producto: ${row.producto_nombre}`);
-                console.log(`Cantidad: ${row.cantidad}`);
-                console.log(`Precio unitario: $${row.precio_unitario}`);
-                console.log(`Estado: ${row.estado}`);
-                console.log(`Notas: ${row.notas || 'N/A'}`);
-                console.log('-------------------');
-            });
-            askOption();
-        });
-    });
-}
-
-// Función para ver logs de auditoría
-function showLogs() {
-    db.all('SELECT * FROM logs ORDER BY fecha DESC LIMIT 10', [], (err, rows) => {
-        if (err) {
-            console.error('Error al obtener logs:', err);
-            return;
-        }
-        console.log('\n=== Últimos 10 Logs ===');
-        rows.forEach(row => {
-            console.log(`Tabla: ${row.tabla}`);
-            console.log(`Acción: ${row.accion}`);
-            console.log(`Fecha: ${row.fecha}`);
-            console.log(`Usuario: ${row.usuario_id}`);
-            console.log('-------------------');
-        });
-        askOption();
-    });
-}
-
-// Función para preguntar la opción al usuario
-function askOption() {
-    showMenu();
-    rl.question('Selecciona una opción: ', (option) => {
-        switch(option) {
-            case '1':
-                showProducts();
-                break;
-            case '2':
-                showMesas();
-                break;
-            case '3':
-                showUsuarios();
-                break;
-            case '4':
-                showOrdenesActivas();
-                break;
-            case '5':
-                createNewOrder();
-                break;
-            case '6':
-                addProductToOrder();
-                break;
-            case '7':
-                showOrderDetails();
-                break;
-            case '8':
-                showLogs();
-                break;
-            case '9':
-                console.log('Saliendo...');
-                rl.close();
-                db.close();
-                break;
-            default:
-                console.log('Opción no válida');
-                askOption();
-        }
-    });
-}
-
-// Iniciar el programa
-console.log('Bienvenido al campo de pruebas de la base de datos');
-askOption(); 

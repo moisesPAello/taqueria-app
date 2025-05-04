@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../../context/AuthContext';
 
 interface Mesa {
   id: number;
@@ -95,37 +95,45 @@ const CrearOrden: React.FC = () => {
   };
 
   const handleCrearOrden = async () => {
-    if (!mesaSeleccionada || productosSeleccionados.length === 0) {
-      setError('Selecciona una mesa y al menos un producto');
-      return;
+    if (!mesaSeleccionada) {
+        setError('Debes seleccionar una mesa');
+        return;
+    }
+    
+    if (productosSeleccionados.length === 0) {
+        setError('Debes agregar al menos un producto');
+        return;
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/ordenes', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mesa_id: mesaSeleccionada,
-          usuario_id: user?.id,
-          productos: productosSeleccionados.map(p => ({
-            producto_id: p.producto.id,
-            cantidad: p.cantidad,
-          })),
-        }),
-      });
+        const response = await fetch('http://localhost:3000/api/ordenes', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                mesa_id: mesaSeleccionada,
+                usuario_id: user?.id,
+                productos: productosSeleccionados.map(p => ({
+                    producto_id: p.producto.id,
+                    cantidad: p.cantidad,
+                })),
+            }),
+        });
 
-      if (!response.ok) {
-        throw new Error('Error al crear la orden');
-      }
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Error al crear la orden');
+        }
 
-      navigate('/ordenes');
+        // La orden se creó correctamente, navegar a la lista de órdenes
+        navigate('/ordenes');
     } catch (err) {
-      setError('Error al crear la orden');
+        setError(err instanceof Error ? err.message : 'Error al crear la orden');
+        console.error('Error detallado:', err);
     }
-  };
+};
 
   if (loading) {
     return (
@@ -248,4 +256,4 @@ const CrearOrden: React.FC = () => {
   );
 };
 
-export default CrearOrden; 
+export default CrearOrden;

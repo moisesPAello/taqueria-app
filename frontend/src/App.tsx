@@ -1,16 +1,17 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './components/auth/Login';
-import Register from './components/auth/Register';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import MesasList from './components/mesas/MesasList';
-import ProductosList from './components/productos/ProductosList';
-import CrearOrden from './components/ordenes/CrearOrden';
-import OrdenesList from './components/ordenes/OrdenesList';
-import Dashboard from './components/dashboard/Dashboard';
+import Login from './components/features/auth/Login';
+import Register from './components/features/auth/Register';
+import ProtectedRoute from './components/features/auth/ProtectedRoute';
+import MesasList from './components/features/mesas/MesasList';
+import ProductosList from './components/features/productos/ProductosList';
+import CrearOrden from './components/features/ordenes/CrearOrden';
+import OrdenesList from './components/features/ordenes/OrdenesList';
+import Dashboard from './components/features/Dashboard';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { pathname } = useLocation(); // Obtiene la ruta actual
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -18,6 +19,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     logout();
     navigate('/login');
   };
+
+  const isActive = (path: string) => pathname === path ? 'border-indigo-500 text-gray-900' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700';
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -31,32 +34,32 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <Link
                   to="/dashboard"
-                  className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/dashboard')}`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   to="/mesas"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/mesas')}`}
                 >
                   Mesas
                 </Link>
                 <Link
                   to="/productos"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/productos')}`}
                 >
                   Productos
                 </Link>
                 <Link
                   to="/ordenes"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/ordenes')}`}
                 >
                   Órdenes
                 </Link>
                 {user?.rol === 'admin' && (
                   <Link
                     to="/admin"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/admin')}`}
                   >
                     Administración
                   </Link>
