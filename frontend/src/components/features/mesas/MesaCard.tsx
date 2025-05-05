@@ -1,68 +1,155 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface Mesa {
   id: number;
   numero: number;
   capacidad: number;
-  estado: 'disponible' | 'ocupada' | 'reservada';
+  estado: 'disponible' | 'ocupada' | 'en_servicio' | 'mantenimiento';
+  mesero_nombre?: string;
+  mesero_id?: number;
   orden_actual?: number;
+}
+
+interface Mesero {
+  id: number;
+  nombre: string;
+  rol: string;
 }
 
 interface MesaCardProps {
   mesa: Mesa;
-  onOcupar: (mesaId: number) => void;
+  meseros: Mesero[];
+  onAsignarMesero: (mesaId: number, meseroId: number) => void;
+  onActualizarEstado: (mesaId: number, estado: Mesa['estado']) => void;
   onLiberar: (mesaId: number) => void;
 }
 
-const MesaCard: React.FC<MesaCardProps> = ({ mesa, onOcupar, onLiberar }) => {
+const MesaCard: React.FC<MesaCardProps> = ({
+  mesa,
+  meseros,
+  onAsignarMesero,
+  onActualizarEstado,
+  onLiberar
+}) => {
+  const [showMeseros, setShowMeseros] = useState(false);
+  const navigate = useNavigate();
+
   const getEstadoColor = () => {
     switch (mesa.estado) {
       case 'disponible':
-        return 'bg-green-100 text-green-800';
+        return 'border-green-500 bg-green-50';
       case 'ocupada':
-        return 'bg-red-100 text-red-800';
-      case 'reservada':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'border-red-500 bg-red-50';
+      case 'en_servicio':
+        return 'border-yellow-500 bg-yellow-50';
+      case 'mantenimiento':
+        return 'border-gray-500 bg-gray-50';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'border-gray-300';
+    }
+  };
+
+  const getEstadoIcono = () => {
+    switch (mesa.estado) {
+      case 'disponible':
+        return (
+          <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'ocupada':
+        return (
+          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'en_servicio':
+        return (
+          <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="text-lg font-semibold">Mesa {mesa.numero}</h3>
-          <p className="text-sm text-gray-600">Capacidad: {mesa.capacidad} personas</p>
-        </div>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor()}`}>
+    <div className={`relative rounded-lg border-2 p-4 shadow-sm hover:shadow-md transition-shadow ${getEstadoColor()}`}>
+      <div className="absolute top-3 right-3">
+        {getEstadoIcono()}
+      </div>
+
+      <div className="mb-4">
+        <h3 className="text-lg font-bold">Mesa {mesa.numero}</h3>
+        <p className="text-sm text-gray-600">Capacidad: {mesa.capacidad} personas</p>
+        {mesa.mesero_nombre && (
+          <p className="text-sm text-gray-600">Mesero: {mesa.mesero_nombre}</p>
+        )}
+        <span className="inline-block mt-2 px-2 py-1 text-sm rounded-full bg-white border border-current text-gray-700">
           {mesa.estado.charAt(0).toUpperCase() + mesa.estado.slice(1)}
         </span>
       </div>
-      
-      <div className="mt-4 flex gap-2">
-        {mesa.estado === 'disponible' && (
+
+      <div className="space-y-2">
+        {mesa.estado === 'disponible' && !mesa.mesero_id && (
+          <div>
+            <button
+              onClick={() => setShowMeseros(!showMeseros)}
+              className="w-full bg-primary text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+            >
+              Asignar Mesero
+            </button>
+
+            {showMeseros && (
+              <div className="mt-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Seleccionar Mesero:</h4>
+                <div className="space-y-1">
+                  {meseros.map(mesero => (
+                    <button
+                      key={mesero.id}
+                      onClick={() => {
+                        onAsignarMesero(mesa.id, mesero.id);
+                        setShowMeseros(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded-md transition-colors"
+                    >
+                      {mesero.nombre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mesa.estado === 'disponible' && mesa.mesero_id && (
           <button
-            onClick={() => onOcupar(mesa.id)}
-            className="flex-1 bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            onClick={() => onActualizarEstado(mesa.id, 'ocupada')}
+            className="w-full bg-secondary text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
           >
-            Ocupar Mesa
+            Crear Orden
           </button>
         )}
-        
-        {mesa.estado === 'ocupada' && (
+
+        {(mesa.estado === 'ocupada' || mesa.estado === 'en_servicio') && (
           <>
             <button
-              onClick={() => window.location.href = `/ordenes/${mesa.orden_actual}`}
-              className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              onClick={() => mesa.orden_actual && navigate(`/ordenes/${mesa.orden_actual}`)}
+              className="w-full bg-accent text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
             >
-              Ver Orden
+              Ver Orden Actual
             </button>
             <button
               onClick={() => onLiberar(mesa.id)}
-              className="flex-1 bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
             >
-              Liberar
+              Liberar Mesa
             </button>
           </>
         )}
@@ -71,4 +158,4 @@ const MesaCard: React.FC<MesaCardProps> = ({ mesa, onOcupar, onLiberar }) => {
   );
 };
 
-export default MesaCard; 
+export default MesaCard;

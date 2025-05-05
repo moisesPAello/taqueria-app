@@ -1,0 +1,5 @@
+id,nombre,rol,usuario,contrasena,estado,fecha_creacion,ultimo_acceso,creado_por,actualizado_por,fecha_actualizacion
+1,Administrador,admin,admin@taqueria.com,admin123,activo,2025-05-04 06:36:29,,,,
+2,Juan Mesero,mesero,juan@taqueria.com,juan123,activo,2025-05-04 06:36:29,,,,
+3,Ana Mesera,mesero,ana@taqueria.com,ana123,activo,2025-05-04 06:36:29,,,,
+4,Pedro Cocinero,cocinero,pedro@taqueria.com,pedro123,activo,2025-05-04 06:36:29,,,,
