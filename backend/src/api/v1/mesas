@@ -1,34 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../../../config/database');
+const MesaController = require('../../controllers/mesaController');
 
 // Obtener todas las mesas
-router.get('/', (req, res) => {
-    db.all('SELECT * FROM mesas', [], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-            return;
-        }
-        res.json(rows);
-    });
-});
+router.get('/', MesaController.getMesas);
+
+// Obtener una mesa específica
+router.get('/:id', MesaController.getMesa);
+
+// Asignar mesero a mesa
+router.post('/:id/asignar-mesero', MesaController.asignarMesero);
 
 // Actualizar estado de mesa
-router.put('/:id/estado', (req, res) => {
-    const { id } = req.params;
-    const { estado } = req.body;
-    
-    db.run(
-        'UPDATE mesas SET estado = ? WHERE id = ?',
-        [estado, id],
-        function(err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            res.json({ message: 'Estado de mesa actualizado' });
-        }
-    );
-});
+router.put('/:id/estado', MesaController.actualizarEstado);
+
+// Liberar mesa
+router.post('/:id/liberar', MesaController.liberarMesa);
 
 module.exports = router;

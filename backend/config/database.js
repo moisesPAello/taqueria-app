@@ -34,13 +34,17 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             numero INTEGER NOT NULL UNIQUE,
             capacidad INTEGER NOT NULL,
-            estado TEXT NOT NULL DEFAULT 'disponible' CHECK(estado IN ('disponible', 'ocupada', 'reservada', 'mantenimiento')),
+            estado TEXT NOT NULL DEFAULT 'disponible' CHECK(estado IN ('disponible', 'ocupada', 'en_servicio', 'mantenimiento')),
             ubicacion TEXT,
             notas TEXT,
+            mesero_id INTEGER,
+            orden_actual INTEGER,
             creado_por INTEGER,
             fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             actualizado_por INTEGER,
             fecha_actualizacion TIMESTAMP,
+            FOREIGN KEY (mesero_id) REFERENCES usuarios(id),
+            FOREIGN KEY (orden_actual) REFERENCES ordenes(id),
             FOREIGN KEY (creado_por) REFERENCES usuarios(id),
             FOREIGN KEY (actualizado_por) REFERENCES usuarios(id)
         )`);

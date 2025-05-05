@@ -1,0 +1,32 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../../../config/database');
+
+// Obtener usuarios filtrados por rol
+router.get('/', (req, res) => {
+    const { rol } = req.query;
+    
+    let query = 'SELECT id, nombre, rol, usuario FROM usuarios WHERE estado = "activo"';
+    const params = [];
+    
+    if (rol) {
+        query += ' AND rol = ?';
+        params.push(rol);
+    }
+    
+    console.log('Executing query:', query, 'with params:', params); // Debug log
+    
+    db.all(query, params, (err, rows) => {
+        if (err) {
+            console.error('Error al obtener usuarios:', err);
+            return res.status(500).json({ error: 'Error al obtener usuarios' });
+        }
+
+        // Always return an array, even if empty
+        const users = rows || [];
+        console.log('Users found:', users); // Debug log
+        res.json(users);
+    });
+});
+
+module.exports = router;
