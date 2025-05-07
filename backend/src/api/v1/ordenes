@@ -295,7 +295,7 @@ router.post('/:id/cancelar', (req, res) => {
 // Cerrar orden con pago
 router.post('/:id/pagar', (req, res) => {
     const { id } = req.params;
-    const { metodo_pago, notas } = req.body;
+    const { metodo_pago, notas, pagos_divididos } = req.body;
     const usuario_id = req.user?.id;
 
     if (!usuario_id) {
@@ -306,13 +306,35 @@ router.post('/:id/pagar', (req, res) => {
         return res.status(400).json({ error: 'Método de pago inválido' });
     }
 
+    // Validar pagos divididos si se proporcionan
+    if (pagos_divididos && Array.isArray(pagos_divididos)) {
+        // Obtener el total de la orden
+        db.get('SELECT total FROM ordenes WHERE id = ?', [id], (err, orden) => {
+            if (err) {
+                return res.status(500).json({ error: 'Error al obtener el total de la orden' });
+            }
+
+            const total = orden.total;
+            const sumaPagos = pagos_divididos.reduce((sum, pago) => sum + pago.monto, 0);
+
+            // Validar que la suma de los pagos sea igual al total
+            if (Math.abs(sumaPagos - total) > 0.01) { // Permitir diferencia de 1 centavo por redondeo
+                return res.status(400).json({ 
+                    error: 'La suma de los pagos divididos debe ser igual al total de la orden',
+                    total: total,
+                    suma_pagos: sumaPagos
+                });
+            }
+        });
+    }
+
     db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
         try {
             // 1. Verificar que la orden exista y esté activa
             db.get(
-                'SELECT mesa_id FROM ordenes WHERE id = ? AND estado = "activa"',
+                'SELECT mesa_id, total FROM ordenes WHERE id = ? AND estado = "activa"',
                 [id],
                 function(err, orden) {
                     if (err) {
@@ -347,7 +369,26 @@ router.post('/:id/pagar', (req, res) => {
                                 return res.status(500).json({ error: 'Error al cerrar la orden' });
                             }
 
-                            // 3. Actualizar estado de la mesa
+                            // 3. Registrar pagos divididos si existen
+                            if (pagos_divididos && Array.isArray(pagos_divididos)) {
+                                const stmt = db.prepare(
+                                    'INSERT INTO pagos_divididos (orden_id, cliente_numero, monto) VALUES (?, ?, ?)'
+                                );
+
+                                pagos_divididos.forEach((pago, index) => {
+                                    stmt.run([id, index + 1, pago.monto], function(err) {
+                                        if (err) {
+                                            console.error('Error al registrar pago dividido:', err);
+                                            db.run('ROLLBACK');
+                                            return res.status(500).json({ error: 'Error al registrar pagos divididos' });
+                                        }
+                                    });
+                                });
+
+                                stmt.finalize();
+                            }
+
+                            // 4. Actualizar estado de la mesa
                             db.run(
                                 'UPDATE mesas SET estado = "disponible" WHERE id = ?',
                                 [orden.mesa_id],

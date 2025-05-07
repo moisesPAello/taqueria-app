@@ -9,6 +9,7 @@ interface Producto {
   precio: number;
   cantidad: number;
   notas?: string;
+  seleccionado?: boolean;  // Para división de cuenta
 }
 
 interface Orden {
@@ -21,9 +22,15 @@ interface Orden {
   notas?: string;
   num_personas: number;
   fecha_creacion: string;
+  metodo_pago?: 'efectivo' | 'tarjeta' | 'transferencia';
 }
 
 type MetodoPago = 'efectivo' | 'tarjeta' | 'transferencia';
+
+interface PagoCliente {
+  cliente_numero: number;
+  monto: number;
+}
 
 const OrdenDetalles: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +42,10 @@ const OrdenDetalles: React.FC = () => {
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo');
   const [notas, setNotas] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [productosSeleccionados, setProductosSeleccionados] = useState<Producto[]>([]);
+  const [modoDivisionCuenta, setModoDivisionCuenta] = useState(false);
+  const [pagosDivididos, setPagosDivididos] = useState<PagoCliente[]>([]);
+  const [modoPagoDividido, setModoPagoDividido] = useState(false);
 
   useEffect(() => {
     const cargarOrden = async () => {
@@ -42,6 +53,7 @@ const OrdenDetalles: React.FC = () => {
         setLoading(true);
         const data = await ordenesService.getById(Number(id));
         setOrden(data);
+        setProductosSeleccionados(data.productos.map((p: Producto) => ({ ...p, seleccionado: true })));
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error al cargar los detalles de la orden');
@@ -56,19 +68,61 @@ const OrdenDetalles: React.FC = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    if (orden) {
+      setProductosSeleccionados(prev => 
+        prev.map(p => ({ ...p, seleccionado: modoDivisionCuenta }))
+      );
+    }
+  }, [modoDivisionCuenta, orden]);
+
   const mostrarNotificacion = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handlePagar = async () => {
+  const validarOrden = () => {
     if (!orden || orden.productos.length === 0) {
-      mostrarNotificacion('error', 'No se puede pagar una orden vacía');
-      return;
+      mostrarNotificacion('error', 'No se puede procesar una orden vacía');
+      return false;
     }
 
     if (orden.estado !== 'activa') {
       mostrarNotificacion('error', 'Esta orden ya no está activa');
+      return false;
+    }
+
+    return true;
+  };
+
+  const agregarCliente = () => {
+    setPagosDivididos(prev => [...prev, { cliente_numero: prev.length + 1, monto: 0 }]);
+  };
+
+  const eliminarCliente = (index: number) => {
+    setPagosDivididos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const actualizarMontoPago = (index: number, monto: number) => {
+    setPagosDivididos(prev => 
+      prev.map((pago, i) => 
+        i === index ? { ...pago, monto } : pago
+      )
+    );
+  };
+
+  const validarPagosDivididos = () => {
+    if (!modoPagoDividido || !orden) return true;
+
+    const totalPagos = pagosDivididos.reduce((sum, pago) => sum + pago.monto, 0);
+    return Math.abs(totalPagos - orden.total) <= 0.01; // Permitir diferencia de 1 centavo por redondeo
+  };
+
+  const handlePagar = async () => {
+    if (!validarOrden()) return;
+
+    if (modoPagoDividido && !validarPagosDivididos()) {
+      mostrarNotificacion('error', 'La suma de los pagos debe ser igual al total de la orden');
       return;
     }
 
@@ -76,7 +130,8 @@ const OrdenDetalles: React.FC = () => {
       setLoading(true);
       await ordenesService.pagar(Number(id), {
         metodo_pago: metodoPago,
-        notas: notas.trim() || undefined
+        notas: notas.trim() || undefined,
+        pagos_divididos: modoPagoDividido ? pagosDivididos : undefined
       });
       mostrarNotificacion('success', 'Orden pagada exitosamente');
       setShowPagoModal(false);
@@ -89,6 +144,20 @@ const OrdenDetalles: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleProductoSeleccionado = (productoId: number) => {
+    if (!modoDivisionCuenta) return;
+    
+    setProductosSeleccionados(prev => 
+      prev.map(p => p.id === productoId ? { ...p, seleccionado: !p.seleccionado } : p)
+    );
+  };
+
+  const calcularTotalSeleccionado = () => {
+    return productosSeleccionados
+      .filter(p => p.seleccionado)
+      .reduce((total, p) => total + (p.precio * p.cantidad), 0);
   };
 
   if (loading) {
@@ -131,19 +200,31 @@ const OrdenDetalles: React.FC = () => {
         <h1 className="text-2xl font-bold">Orden #{orden.id}</h1>
         <div className="space-x-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/mesas')}
             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
           >
-            Volver
+            Volver a Mesas
           </button>
           {orden.estado === 'activa' && (
-            <button
-              onClick={() => setShowPagoModal(true)}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-              disabled={orden.productos.length === 0}
-            >
-              Pagar
-            </button>
+            <>
+              <button
+                onClick={() => setModoDivisionCuenta(!modoDivisionCuenta)}
+                className={`px-4 py-2 rounded-lg ${
+                  modoDivisionCuenta 
+                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-300' 
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}
+              >
+                {modoDivisionCuenta ? 'Cancelar División' : 'Dividir Cuenta'}
+              </button>
+              <button
+                onClick={() => setShowPagoModal(true)}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                disabled={orden.productos.length === 0}
+              >
+                Pagar
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -163,7 +244,13 @@ const OrdenDetalles: React.FC = () => {
             </p>
             <p className="flex justify-between">
               <span className="text-gray-600">Estado:</span>
-              <span className="inline-block px-2 py-1 text-sm rounded-full bg-green-100 text-green-800 font-medium">
+              <span className={`inline-block px-2 py-1 text-sm rounded-full ${
+                orden.estado === 'activa' 
+                  ? 'bg-green-100 text-green-800' 
+                  : orden.estado === 'cerrada'
+                    ? 'bg-gray-100 text-gray-800'
+                    : 'bg-red-100 text-red-800'
+              } font-medium`}>
                 {orden.estado.charAt(0).toUpperCase() + orden.estado.slice(1)}
               </span>
             </p>
@@ -175,6 +262,12 @@ const OrdenDetalles: React.FC = () => {
               <span className="text-gray-600">Hora:</span>
               <span className="font-medium">{hora}</span>
             </p>
+            {orden.metodo_pago && (
+              <p className="flex justify-between">
+                <span className="text-gray-600">Método de pago:</span>
+                <span className="font-medium capitalize">{orden.metodo_pago}</span>
+              </p>
+            )}
             {orden.notas && (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-gray-600 text-sm font-medium mb-1">Notas generales:</p>
@@ -189,7 +282,13 @@ const OrdenDetalles: React.FC = () => {
           <h2 className="text-lg font-semibold mb-4">Productos</h2>
           <div className="divide-y divide-gray-200">
             {orden.productos.map((producto) => (
-              <div key={producto.id} className="py-4 first:pt-0 last:pb-0">
+              <div 
+                key={producto.id} 
+                className={`py-4 first:pt-0 last:pb-0 ${
+                  modoDivisionCuenta ? 'cursor-pointer hover:bg-gray-50' : ''
+                } ${producto.seleccionado ? 'bg-indigo-50' : ''}`}
+                onClick={() => toggleProductoSeleccionado(producto.id)}
+              >
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-medium text-lg">{producto.nombre}</h3>
@@ -225,7 +324,7 @@ const OrdenDetalles: React.FC = () => {
               <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                 <span className="text-lg font-bold">Total:</span>
                 <span className="text-2xl font-bold text-indigo-600">
-                  ${orden.total.toFixed(2)}
+                  ${modoDivisionCuenta ? calcularTotalSeleccionado().toFixed(2) : orden.total.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -281,6 +380,77 @@ const OrdenDetalles: React.FC = () => {
                 </div>
               </div>
 
+              {/* Toggle para pago dividido */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Dividir el pago</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoPagoDividido(!modoPagoDividido);
+                    if (!modoPagoDividido) {
+                      setPagosDivididos([{ cliente_numero: 1, monto: orden?.total || 0 }]);
+                    }
+                  }}
+                  className={`${
+                    modoPagoDividido 
+                      ? 'bg-indigo-600 text-white' 
+                      : 'bg-gray-200 text-gray-700'
+                  } px-4 py-2 rounded-lg transition-colors`}
+                >
+                  {modoPagoDividido ? 'Desactivar' : 'Activar'}
+                </button>
+              </div>
+
+              {/* Formulario de pagos divididos */}
+              {modoPagoDividido && (
+                <div className="space-y-4 border rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium">Pagos por cliente</h4>
+                    <button
+                      type="button"
+                      onClick={agregarCliente}
+                      className="text-indigo-600 hover:text-indigo-800"
+                    >
+                      + Agregar cliente
+                    </button>
+                  </div>
+
+                  {pagosDivididos.map((pago, index) => (
+                    <div key={index} className="flex items-center gap-4">
+                      <span className="text-sm font-medium w-24">Cliente {pago.cliente_numero}</span>
+                      <input
+                        type="number"
+                        value={pago.monto || ''}
+                        onChange={(e) => actualizarMontoPago(index, parseFloat(e.target.value) || 0)}
+                        className="block flex-1 rounded-lg border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        min="0"
+                        step="0.01"
+                      />
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => eliminarCliente(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="text-sm font-medium">Total pagos:</span>
+                    <span className={`font-medium ${
+                      validarPagosDivididos() ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ${pagosDivididos.reduce((sum, p) => sum + p.monto, 0).toFixed(2)} / ${orden?.total.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="notas" className="block text-sm font-medium text-gray-700 mb-2">
                   Notas (opcional)
@@ -310,7 +480,7 @@ const OrdenDetalles: React.FC = () => {
                 </button>
                 <button
                   onClick={handlePagar}
-                  disabled={loading}
+                  disabled={loading || (modoPagoDividido && !validarPagosDivididos())}
                   className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
                 >
                   {loading ? 'Procesando...' : 'Confirmar Pago'}

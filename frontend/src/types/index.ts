@@ -26,6 +26,17 @@ export interface OrdenRequest {
     num_personas?: number;
 }
 
+export interface PagoDividido {
+    monto: number;
+    cliente_numero: number;
+}
+
+export interface OrdenPagoRequest {
+    metodo_pago: 'efectivo' | 'tarjeta' | 'transferencia';
+    notas?: string;
+    pagos_divididos?: PagoDividido[];
+}
+
 export interface OrdenResponse {
     id: number;
     mesa: {
