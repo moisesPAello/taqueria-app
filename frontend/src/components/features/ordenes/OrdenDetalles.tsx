@@ -23,12 +23,18 @@ interface Orden {
   fecha_creacion: string;
 }
 
+type MetodoPago = 'efectivo' | 'tarjeta' | 'transferencia';
+
 const OrdenDetalles: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [orden, setOrden] = useState<Orden | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPagoModal, setShowPagoModal] = useState(false);
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo');
+  const [notas, setNotas] = useState('');
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const cargarOrden = async () => {
@@ -49,6 +55,41 @@ const OrdenDetalles: React.FC = () => {
       cargarOrden();
     }
   }, [id]);
+
+  const mostrarNotificacion = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handlePagar = async () => {
+    if (!orden || orden.productos.length === 0) {
+      mostrarNotificacion('error', 'No se puede pagar una orden vacía');
+      return;
+    }
+
+    if (orden.estado !== 'activa') {
+      mostrarNotificacion('error', 'Esta orden ya no está activa');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await ordenesService.pagar(Number(id), {
+        metodo_pago: metodoPago,
+        notas: notas.trim() || undefined
+      });
+      mostrarNotificacion('success', 'Orden pagada exitosamente');
+      setShowPagoModal(false);
+      setTimeout(() => {
+        navigate('/mesas');
+      }, 1500);
+    } catch (err) {
+      mostrarNotificacion('error', 'Error al procesar el pago');
+      console.error('Error al pagar orden:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -74,19 +115,37 @@ const OrdenDetalles: React.FC = () => {
     );
   }
 
-  // Formatear la hora usando la función auxiliar
   const hora = formatearHora(orden.fecha_creacion);
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {notification && (
+        <div className={`mb-4 p-4 rounded-lg ${
+          notification.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Orden #{orden.id}</h1>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-        >
-          Volver
-        </button>
+        <div className="space-x-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+          >
+            Volver
+          </button>
+          {orden.estado === 'activa' && (
+            <button
+              onClick={() => setShowPagoModal(true)}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+              disabled={orden.productos.length === 0}
+            >
+              Pagar
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -173,6 +232,94 @@ const OrdenDetalles: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Pago */}
+      {showPagoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Procesar Pago</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Método de Pago
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('efectivo')}
+                    className={`px-4 py-2 rounded-lg border ${
+                      metodoPago === 'efectivo'
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                        : 'border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('tarjeta')}
+                    className={`px-4 py-2 rounded-lg border ${
+                      metodoPago === 'tarjeta'
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                        : 'border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Tarjeta
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMetodoPago('transferencia')}
+                    className={`px-4 py-2 rounded-lg border ${
+                      metodoPago === 'transferencia'
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                        : 'border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Transferencia
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="notas" className="block text-sm font-medium text-gray-700 mb-2">
+                  Notas (opcional)
+                </label>
+                <textarea
+                  id="notas"
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2 h-24"
+                  placeholder="Agregar notas al pago..."
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-4 border-t">
+                <span className="text-lg font-bold">Total a pagar:</span>
+                <span className="text-2xl font-bold text-indigo-600">
+                  ${orden.total.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowPagoModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handlePagar}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+                >
+                  {loading ? 'Procesando...' : 'Confirmar Pago'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

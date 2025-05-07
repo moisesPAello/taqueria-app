@@ -21,10 +21,10 @@ Desarrollar un sistema gráfico y responsivo para la gestión operativa y admini
 
 | Componente | Tecnología |
 |-----------|------------|
-| **Frontend** | React + Tailwind CSS |
+| **Frontend** | React + TypeScript + Vite + Tailwind CSS |
 | **Backend**  | Node.js + Express |
 | **Base de Datos** | SQLite (LiteSQL) |
-| **Lenguaje** | JavaScript |
+| **Lenguaje** | TypeScript / JavaScript |
 | **Control de versiones** | Git + GitHub |
 | **Diseño UI/UX** | Figma |
 | **Hosting** | Localhost (modo desarrollo) |
@@ -35,23 +35,32 @@ Desarrollar un sistema gráfico y responsivo para la gestión operativa y admini
 
 ```
 taqueria-app/
-├── frontend/           # Interfaz de usuario (React + Tailwind)
+├── frontend/           # Interfaz de usuario (React + TypeScript + Vite)
 │   └── src/
-│       ├── components/ # Elementos reutilizables (Botones, Tablas, etc.)
-│       ├── pages/      # Vistas (Login, Mesas, Órdenes)
-│       ├── services/   # Comunicación con API (Axios/Fetch)
-│       └── hooks/      # Lógica personalizada para UI
+│       ├── components/    # Elementos reutilizables
+│       │   ├── common/    # Componentes base
+│       │   ├── features/  # Componentes específicos por feature
+│       │   └── layout/    # Componentes de estructura
+│       ├── context/      # Contextos de React (Auth, etc.)
+│       ├── hooks/        # Custom hooks
+│       ├── pages/        # Vistas principales
+│       ├── services/     # Comunicación con API
+│       ├── types/        # Definiciones de TypeScript
+│       └── utils/        # Utilidades y helpers
 │
 ├── backend/            # Lógica del servidor (Node.js + Express)
 │   └── src/
-│       ├── controllers/ # Lógica de negocio (manejo de órdenes, productos)
-│       ├── models/      # Definición de estructuras de datos
-│       ├── routes/      # Endpoints de la API
-│       └── middleware/  # Autenticación, validaciones, logs
+│       ├── api/         # Endpoints por versión
+│       ├── controllers/ # Lógica de negocio
+│       ├── models/      # Definición de modelos
+│       ├── services/    # Servicios de negocio
+│       ├── middleware/  # Autenticación, validaciones
+│       └── validators/  # Validación de datos
 │
-└── database/           # Base de datos SQLite
-    ├── migrations/     # Scripts para crear/modificar tablas
-    └── seeds/          # Datos de prueba para desarrollo
+├── database/           # Base de datos SQLite
+│   ├── migrations/     # Scripts para crear/modificar tablas
+│   ├── seeds/         # Datos de prueba
+│   └── backups/       # Respaldos automáticos
 ```
 
 ---
@@ -73,9 +82,9 @@ taqueria-app/
 
 ## 🖥️ Módulos Frontend por Implementar
 
-- [ ] Login y Logout
-- [ ] Dashboard de mesas
-- [ ] Creación y edición de órdenes
+- [x] Login y Logout
+- [x] Dashboard de mesas
+- [x] Creación y edición de órdenes
 - [ ] Control de inventario y productos
 - [ ] Vista de reportes
 - [ ] Gestión de usuarios y roles
@@ -114,6 +123,21 @@ cd backend
 npm install
 npm run dev
 ```
+
+---
+
+## 🗄️ Sistema de Respaldos
+
+El sistema incluye un mecanismo automático de respaldos de la base de datos:
+- Ubicación: `/database/backups/`
+- Formato: `database_backup_YYYYMMDD.db`
+- Frecuencia: Diaria
+- Retención: 30 días
+
+## 🔄 Migraciones Recientes
+
+- `20250505_add_num_personas`: Añade soporte para número de personas por mesa
+- Más detalles en `/database/migrations/`
 
 ---
 

@@ -15,7 +15,7 @@ const fetchWithAuth = async (
   
   // Añadir token de autenticación si existe
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
   
   try {
@@ -166,17 +166,7 @@ export const ordenesService = {
   },
   
   // Crear nueva orden
-  create: async (ordenData: {
-    mesa_id: number;
-    usuario_id: number;
-    productos: Array<{
-      producto_id: number;
-      cantidad: number;
-      notas?: string;
-    }>;
-    notas?: string;
-    num_personas?: number;
-  }) => {
+  create: async (ordenData: OrdenRequest) => {
     return fetchWithAuth('/ordenes', {
       method: 'POST',
       body: JSON.stringify(ordenData)
@@ -194,6 +184,14 @@ export const ordenesService = {
   cancelar: async (id: number) => {
     return fetchWithAuth(`/ordenes/${id}/cancelar`, {
       method: 'POST'
+    });
+  },
+  
+  // Pagar una orden
+  pagar: async (id: number, data: { metodo_pago: 'efectivo' | 'tarjeta' | 'transferencia'; notas?: string }) => {
+    return fetchWithAuth(`/ordenes/${id}/pagar`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     });
   },
   

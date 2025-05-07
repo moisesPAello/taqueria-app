@@ -292,4 +292,89 @@ router.post('/:id/cancelar', (req, res) => {
     });
 });
 
+// Cerrar orden con pago
+router.post('/:id/pagar', (req, res) => {
+    const { id } = req.params;
+    const { metodo_pago, notas } = req.body;
+    const usuario_id = req.user?.id;
+
+    if (!usuario_id) {
+        return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    if (!metodo_pago || !['efectivo', 'tarjeta', 'transferencia'].includes(metodo_pago)) {
+        return res.status(400).json({ error: 'Método de pago inválido' });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        try {
+            // 1. Verificar que la orden exista y esté activa
+            db.get(
+                'SELECT mesa_id FROM ordenes WHERE id = ? AND estado = "activa"',
+                [id],
+                function(err, orden) {
+                    if (err) {
+                        console.error('Error al buscar orden:', err);
+                        db.run('ROLLBACK');
+                        return res.status(500).json({ error: 'Error al buscar la orden' });
+                    }
+
+                    if (!orden) {
+                        db.run('ROLLBACK');
+                        return res.status(404).json({ error: 'Orden no encontrada o no está activa' });
+                    }
+
+                    // 2. Actualizar estado de la orden
+                    db.run(
+                        `UPDATE ordenes 
+                        SET estado = "cerrada",
+                            metodo_pago = ?,
+                            notas = CASE 
+                                WHEN notas IS NULL OR notas = '' THEN ?
+                                ELSE notas || ' | ' || ?
+                            END,
+                            actualizado_por = ?,
+                            fecha_actualizacion = CURRENT_TIMESTAMP,
+                            fecha_cierre = CURRENT_TIMESTAMP
+                        WHERE id = ?`,
+                        [metodo_pago, notas || '', notas || '', usuario_id, id],
+                        function(err) {
+                            if (err) {
+                                console.error('Error al cerrar orden:', err);
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: 'Error al cerrar la orden' });
+                            }
+
+                            // 3. Actualizar estado de la mesa
+                            db.run(
+                                'UPDATE mesas SET estado = "disponible" WHERE id = ?',
+                                [orden.mesa_id],
+                                function(err) {
+                                    if (err) {
+                                        console.error('Error al actualizar mesa:', err);
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ error: 'Error al actualizar estado de mesa' });
+                                    }
+
+                                    db.run('COMMIT');
+                                    res.json({ 
+                                        message: 'Orden cerrada exitosamente',
+                                        orden_id: id
+                                    });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        } catch (err) {
+            console.error('Error en transacción:', err);
+            db.run('ROLLBACK');
+            res.status(500).json({ error: 'Error al procesar el pago' });
+        }
+    });
+});
+
 module.exports = router;

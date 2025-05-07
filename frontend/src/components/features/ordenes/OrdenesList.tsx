@@ -125,7 +125,7 @@ const OrdenesList: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold mb-2">Orden #{orden.id}</h2>
                   <p className="text-gray-600">Mesa: {orden.mesa.numero}</p>
-                  <p className="text-gray-600">Mesero: {orden.mesero}</p>
+                  <p className="text-gray-600">Mesero: {orden.mesero_nombre}</p>
                   <p className="text-gray-600">Productos: {orden.productos}</p>
                   <p className="text-gray-600">Hora: {formatearHora(orden.hora)}</p>
                   {orden.notas && (
