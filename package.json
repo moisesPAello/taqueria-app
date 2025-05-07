@@ -4,8 +4,10 @@
   "description": "Sistema de gestión para cadena de taquerías con interfaz de meseros y panel administrativo",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node backend/server.js",
+    "backend": "cd backend && nodemon server.js",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
   },
   "dependencies": {
     "express": "^4.18.2",

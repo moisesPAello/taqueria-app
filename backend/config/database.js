@@ -1,18 +1,31 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-// Cambiamos la ruta para usar el archivo correcto
-const dbPath = path.join(__dirname, '../../database/database.db');
+// Configurar SQLite para usar UTC
+sqlite3.Database.prototype.runAsync = function(sql, params) {
+    return new Promise((resolve, reject) => {
+        this.run(sql, params, function(err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
+    });
+};
 
-// Crear una nueva instancia de la base de datos
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error al conectar con la base de datos:', err);
-    } else {
-        console.log('Conexión exitosa a la base de datos SQLite');
-        initializeDatabase();
+// Asegurar que las fechas se almacenen en UTC
+const db = new sqlite3.Database(
+    path.join(__dirname, '../../database/database.db'),
+    sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE,
+    (err) => {
+        if (err) {
+            console.error('Error al conectar con la base de datos:', err);
+        } else {
+            console.log('Conexión exitosa con la base de datos');
+            // Configurar la zona horaria UTC
+            db.run('PRAGMA timezone = "UTC"');
+            initializeDatabase();
+        }
     }
-});
+);
 
 function initializeDatabase() {
     db.serialize(() => {
@@ -90,6 +103,7 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mesa_id INTEGER NOT NULL,
             usuario_id INTEGER NOT NULL,
+            num_personas INTEGER NOT NULL DEFAULT 1,
             total REAL NOT NULL DEFAULT 0 CHECK(total >= 0),
             estado TEXT NOT NULL DEFAULT 'activa' CHECK(estado IN ('activa', 'cerrada', 'cancelada')),
             metodo_pago TEXT CHECK(metodo_pago IN ('efectivo', 'tarjeta', 'transferencia')),

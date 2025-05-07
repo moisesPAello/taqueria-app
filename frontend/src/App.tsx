@@ -9,6 +9,7 @@ import ProductosList from './components/features/productos/ProductosList';
 import CrearOrden from './components/features/ordenes/CrearOrden';
 import OrdenesList from './components/features/ordenes/OrdenesList';
 import Dashboard from './components/features/Dashboard';
+import OrdenDetalles from './components/features/ordenes/OrdenDetalles';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation(); // Obtiene la ruta actual
@@ -140,6 +141,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <CrearOrden />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ordenes/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <OrdenDetalles />
                 </Layout>
               </ProtectedRoute>
             }

@@ -168,11 +168,14 @@ export const ordenesService = {
   // Crear nueva orden
   create: async (ordenData: {
     mesa_id: number;
+    usuario_id: number;
     productos: Array<{
       producto_id: number;
       cantidad: number;
       notas?: string;
     }>;
+    notas?: string;
+    num_personas?: number;
   }) => {
     return fetchWithAuth('/ordenes', {
       method: 'POST',

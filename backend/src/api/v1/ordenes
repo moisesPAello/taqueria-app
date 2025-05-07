@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../../config/database');
 
+// Función helper para formatear fecha a zona horaria de Hermosillo
+const formatearFechaHermosillo = (fecha) => {
+    return strftime('%Y-%m-%dT%H:%M:%S.000Z', datetime(fecha, '-7 hours'));
+};
+
 // Obtener órdenes activas
 router.get('/', (req, res) => {
     const query = `
@@ -9,9 +14,9 @@ router.get('/', (req, res) => {
             o.id,
             o.total,
             o.estado,
-            o.fecha_creacion as hora,
+            strftime('%Y-%m-%dT%H:%M:%S.000Z', datetime(o.fecha_creacion, '-7 hours')) as fecha_creacion,
             json_object('numero', m.numero) as mesa,
-            u.nombre as mesero,
+            u.nombre as mesero_nombre,
             COUNT(d.id) as productos
         FROM ordenes o
         LEFT JOIN mesas m ON o.mesa_id = m.id
@@ -28,12 +33,9 @@ router.get('/', (req, res) => {
             return;
         }
 
-        // Log para debug
-        console.log('Órdenes encontradas:', rows);
-
         const formattedRows = rows.map(row => ({
             ...row,
-            hora: new Date(row.hora).toLocaleTimeString(),
+            fecha_creacion: row.fecha_creacion,
             total: parseFloat(row.total).toFixed(2),
             mesa: JSON.parse(row.mesa)
         }));
@@ -48,7 +50,12 @@ router.get('/:id', (req, res) => {
     
     const query = `
         SELECT 
-            o.*,
+            strftime('%Y-%m-%dT%H:%M:%S.000Z', datetime(o.fecha_creacion, '-7 hours')) as fecha_creacion,
+            o.id,
+            o.estado,
+            o.total,
+            o.num_personas,
+            o.notas,
             m.numero as mesa_numero,
             u.nombre as mesero_nombre,
             json_group_array(
@@ -56,20 +63,22 @@ router.get('/:id', (req, res) => {
                     'id', p.id,
                     'nombre', p.nombre,
                     'precio', d.precio_unitario,
-                    'cantidad', d.cantidad
+                    'cantidad', d.cantidad,
+                    'notas', COALESCE(d.notas, '')
                 )
             ) as productos
         FROM ordenes o
-        LEFT JOIN mesas m ON o.mesa_id = m.id
+        JOIN mesas m ON o.mesa_id = m.id
         LEFT JOIN usuarios u ON o.usuario_id = u.id
         LEFT JOIN detalles_orden d ON o.id = d.orden_id
         LEFT JOIN productos p ON d.producto_id = p.id
         WHERE o.id = ?
-        GROUP BY o.id
+        GROUP BY o.id, m.numero, u.nombre
     `;
 
     db.get(query, [id], (err, orden) => {
         if (err) {
+            console.error('Error al obtener orden:', err);
             res.status(500).json({ error: err.message });
             return;
         }
@@ -79,78 +88,206 @@ router.get('/:id', (req, res) => {
             return;
         }
 
-        // Parsear el array de productos que viene como string
-        orden.productos = JSON.parse(orden.productos);
-        
-        res.json(orden);
+        try {
+            orden.productos = JSON.parse(orden.productos);
+            if (orden.productos[0].id === null) {
+                orden.productos = [];
+            }
+            res.json(orden);
+        } catch (parseErr) {
+            console.error('Error al parsear productos:', parseErr);
+            res.status(500).json({ error: 'Error al procesar los datos de la orden' });
+        }
     });
 });
 
 // Crear nueva orden
 router.post('/', (req, res) => {
-    const { mesa_id, usuario_id, productos } = req.body;
+    const { mesa_id, mesero_id, productos, num_personas, notas } = req.body;
+    const usuario_id = req.user?.id;
+
+    if (!usuario_id) {
+        return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
     
+    if (!mesa_id || !mesero_id || !productos || !Array.isArray(productos) || productos.length === 0) {
+        return res.status(400).json({ error: 'Datos de orden incompletos o inválidos' });
+    }
+
     db.serialize(() => {
-        // 1. Iniciar transacción
         db.run('BEGIN TRANSACTION');
         
         try {
-            // 2. Crear la orden
-            db.run(
-                'INSERT INTO ordenes (mesa_id, usuario_id, estado, total) VALUES (?, ?, "activa", 0)',
-                [mesa_id, usuario_id],
-                function(err) {
+            // Primero calculamos el total consultando los precios actuales
+            const placeholders = productos.map(() => '?').join(',');
+            const productIds = productos.map(p => p.producto_id);
+            
+            db.all(
+                `SELECT id, precio FROM productos WHERE id IN (${placeholders})`,
+                productIds,
+                function(err, preciosProductos) {
                     if (err) {
+                        console.error('Error al obtener precios:', err);
                         db.run('ROLLBACK');
-                        return res.status(500).json({ error: err.message });
+                        return res.status(500).json({ error: 'Error al procesar la orden' });
                     }
-                    
-                    const orden_id = this.lastID;
-                    
-                    // 3. Insertar los productos
-                    const stmt = db.prepare(`
-                        INSERT INTO detalles_orden (
-                            orden_id, producto_id, cantidad, precio_unitario
-                        ) VALUES (?, ?, ?, (
-                            SELECT precio FROM productos WHERE id = ?
-                        ))
-                    `);
-                    
-                    productos.forEach(prod => {
-                        stmt.run([orden_id, prod.producto_id, prod.cantidad, prod.producto_id]);
-                    });
-                    
-                    stmt.finalize();
-                    
-                    // 4. Actualizar el total de la orden
-                    db.run(`
-                        UPDATE ordenes 
-                        SET total = (
-                            SELECT SUM(cantidad * precio_unitario) 
-                            FROM detalles_orden 
-                            WHERE orden_id = ?
-                        )
-                        WHERE id = ?
-                    `, [orden_id, orden_id]);
-                    
-                    // 5. Actualizar estado de la mesa
+
+                    // Calcular el total
+                    const preciosMap = new Map(preciosProductos.map(p => [p.id, p.precio]));
+                    const total = productos.reduce((sum, prod) => {
+                        const precio = preciosMap.get(prod.producto_id) || 0;
+                        return sum + (precio * prod.cantidad);
+                    }, 0);
+
+                    // Crear la orden con el total calculado usando el mesero_id
                     db.run(
-                        'UPDATE mesas SET estado = "ocupada" WHERE id = ?',
-                        [mesa_id]
+                        `INSERT INTO ordenes (
+                            mesa_id, 
+                            usuario_id, 
+                            estado, 
+                            total,
+                            num_personas, 
+                            notas,
+                            creado_por,
+                            fecha_creacion
+                        ) VALUES (?, ?, "activa", ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                        [mesa_id, mesero_id, total, num_personas || 1, notas || '', usuario_id],
+                        function(err) {
+                            if (err) {
+                                console.error('Error al crear orden:', err);
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: 'Error al crear la orden' });
+                            }
+                            
+                            const orden_id = this.lastID;
+                            
+                            // Insertar los productos con sus notas individuales
+                            const stmt = db.prepare(`
+                                INSERT INTO detalles_orden (
+                                    orden_id, 
+                                    producto_id, 
+                                    cantidad, 
+                                    precio_unitario,
+                                    notas,
+                                    creado_por
+                                ) VALUES (?, ?, ?, ?, ?, ?)
+                            `);
+                            
+                            productos.forEach(prod => {
+                                const precio = preciosMap.get(prod.producto_id) || 0;
+                                stmt.run([
+                                    orden_id, 
+                                    prod.producto_id, 
+                                    prod.cantidad, 
+                                    precio,
+                                    prod.notas || '',
+                                    usuario_id
+                                ]);
+                            });
+                            
+                            stmt.finalize();
+                            
+                            // Actualizar estado de la mesa
+                            db.run(
+                                'UPDATE mesas SET estado = "ocupada" WHERE id = ?',
+                                [mesa_id],
+                                function(err) {
+                                    if (err) {
+                                        console.error('Error al actualizar mesa:', err);
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ error: 'Error al actualizar estado de mesa' });
+                                    }
+
+                                    db.run('COMMIT');
+                                    res.json({ 
+                                        message: 'Orden creada exitosamente',
+                                        orden_id 
+                                    });
+                                }
+                            );
+                        }
                     );
-                    
-                    // 6. Confirmar transacción
-                    db.run('COMMIT');
-                    
-                    res.json({ 
-                        message: 'Orden creada exitosamente',
-                        orden_id 
-                    });
                 }
             );
         } catch (err) {
+            console.error('Error en transacción:', err);
             db.run('ROLLBACK');
-            res.status(500).json({ error: err.message });
+            res.status(500).json({ error: 'Error al procesar la orden' });
+        }
+    });
+});
+
+// Cancelar orden
+router.post('/:id/cancelar', (req, res) => {
+    const { id } = req.params;
+    const usuario_id = req.user?.id;
+
+    if (!usuario_id) {
+        return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        try {
+            // 1. Obtener la mesa_id de la orden
+            db.get(
+                'SELECT mesa_id FROM ordenes WHERE id = ? AND estado = "activa"',
+                [id],
+                function(err, orden) {
+                    if (err) {
+                        console.error('Error al buscar orden:', err);
+                        db.run('ROLLBACK');
+                        return res.status(500).json({ error: 'Error al buscar la orden' });
+                    }
+
+                    if (!orden) {
+                        db.run('ROLLBACK');
+                        return res.status(404).json({ error: 'Orden no encontrada o no está activa' });
+                    }
+
+                    // 2. Actualizar estado de la orden
+                    db.run(
+                        `UPDATE ordenes 
+                        SET estado = "cancelada",
+                            actualizado_por = ?,
+                            fecha_actualizacion = CURRENT_TIMESTAMP,
+                            fecha_cierre = CURRENT_TIMESTAMP
+                        WHERE id = ?`,
+                        [usuario_id, id],
+                        function(err) {
+                            if (err) {
+                                console.error('Error al cancelar orden:', err);
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: 'Error al cancelar la orden' });
+                            }
+
+                            // 3. Actualizar estado de la mesa
+                            db.run(
+                                'UPDATE mesas SET estado = "disponible" WHERE id = ?',
+                                [orden.mesa_id],
+                                function(err) {
+                                    if (err) {
+                                        console.error('Error al actualizar mesa:', err);
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ error: 'Error al actualizar estado de mesa' });
+                                    }
+
+                                    db.run('COMMIT');
+                                    res.json({ 
+                                        message: 'Orden cancelada exitosamente',
+                                        orden_id: id
+                                    });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        } catch (err) {
+            console.error('Error en transacción:', err);
+            db.run('ROLLBACK');
+            res.status(500).json({ error: 'Error al procesar la cancelación' });
         }
     });
 });

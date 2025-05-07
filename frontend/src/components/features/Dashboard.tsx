@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatearHora } from '../../utils/dateUtils';
 
 interface DashboardStats {
   totalOrdenes: number;
@@ -142,7 +143,7 @@ const Dashboard: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{orden.mesero}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{orden.productos}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${orden.total.toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{orden.hora}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatearHora(orden.hora)}</td>
                 </tr>
               ))}
             </tbody>
@@ -153,4 +154,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

@@ -79,6 +79,16 @@ const MesaCard: React.FC<MesaCardProps> = ({
     }
   };
 
+  const handleAgregarOrden = () => {
+    navigate('/ordenes/nueva', { 
+      state: { 
+        mesaId: mesa.id, 
+        mesaNumero: mesa.numero,
+        meseroId: mesa.mesero_id
+      }
+    });
+  };
+
   return (
     <div className={`relative rounded-lg border-2 p-4 shadow-sm hover:shadow-md transition-shadow ${getEstadoColor()}`}>
       <div className="absolute top-3 right-3">
@@ -130,10 +140,10 @@ const MesaCard: React.FC<MesaCardProps> = ({
 
         {mesa.estado === 'disponible' && mesa.mesero_id && (
           <button
-            onClick={() => onActualizarEstado(mesa.id, 'ocupada')}
+            onClick={handleAgregarOrden}
             className="w-full bg-secondary text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
           >
-            Crear Orden
+            Añadir Orden
           </button>
         )}
 
