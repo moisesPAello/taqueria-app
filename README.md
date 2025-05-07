@@ -144,6 +144,7 @@ El sistema incluye un mecanismo automático de respaldos de la base de datos:
 ## 🧑‍💻 Autor
 
 Moisés Pérez Aello  
+Itzel Alejandra Monroy Alvarez
 Proyecto académico para la materia de Sistemas de Información
 
 ---
