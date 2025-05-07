@@ -4,6 +4,8 @@ export interface Producto {
     precio: number;
     categoria: string;
     descripcion?: string;
+    stock: number;
+    stock_minimo: number;
     disponible: boolean;
     imagen?: string;
 }

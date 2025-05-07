@@ -118,28 +118,43 @@ router.post('/', (req, res) => {
         db.run('BEGIN TRANSACTION');
         
         try {
-            // Primero calculamos el total consultando los precios actuales
+            // 1. Verificar stock disponible
             const placeholders = productos.map(() => '?').join(',');
             const productIds = productos.map(p => p.producto_id);
             
             db.all(
-                `SELECT id, precio FROM productos WHERE id IN (${placeholders})`,
+                `SELECT id, precio, stock, nombre FROM productos WHERE id IN (${placeholders})`,
                 productIds,
-                function(err, preciosProductos) {
+                function(err, productosInfo) {
                     if (err) {
-                        console.error('Error al obtener precios:', err);
+                        console.error('Error al obtener productos:', err);
                         db.run('ROLLBACK');
                         return res.status(500).json({ error: 'Error al procesar la orden' });
                     }
 
+                    const productosMap = new Map(productosInfo.map(p => [p.id, p]));
+                    
+                    // Verificar stock suficiente
+                    const stockInsuficiente = productos.find(prod => {
+                        const producto = productosMap.get(prod.producto_id);
+                        return !producto || producto.stock < prod.cantidad;
+                    });
+
+                    if (stockInsuficiente) {
+                        const producto = productosMap.get(stockInsuficiente.producto_id);
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ 
+                            error: `Stock insuficiente para ${producto.nombre}. Disponible: ${producto.stock}` 
+                        });
+                    }
+
                     // Calcular el total
-                    const preciosMap = new Map(preciosProductos.map(p => [p.id, p.precio]));
                     const total = productos.reduce((sum, prod) => {
-                        const precio = preciosMap.get(prod.producto_id) || 0;
+                        const precio = productosMap.get(prod.producto_id)?.precio || 0;
                         return sum + (precio * prod.cantidad);
                     }, 0);
 
-                    // Crear la orden con el total calculado usando el mesero_id
+                    // 2. Crear la orden
                     db.run(
                         `INSERT INTO ordenes (
                             mesa_id, 
@@ -161,8 +176,8 @@ router.post('/', (req, res) => {
                             
                             const orden_id = this.lastID;
                             
-                            // Insertar los productos con sus notas individuales
-                            const stmt = db.prepare(`
+                            // 3. Insertar detalles y reducir stock
+                            const stmtDetalles = db.prepare(`
                                 INSERT INTO detalles_orden (
                                     orden_id, 
                                     producto_id, 
@@ -172,10 +187,20 @@ router.post('/', (req, res) => {
                                     creado_por
                                 ) VALUES (?, ?, ?, ?, ?, ?)
                             `);
+
+                            const stmtStock = db.prepare(`
+                                UPDATE productos 
+                                SET stock = stock - ?, 
+                                    actualizado_por = ?,
+                                    fecha_actualizacion = CURRENT_TIMESTAMP
+                                WHERE id = ?
+                            `);
                             
                             productos.forEach(prod => {
-                                const precio = preciosMap.get(prod.producto_id) || 0;
-                                stmt.run([
+                                const precio = productosMap.get(prod.producto_id)?.precio || 0;
+                                
+                                // Insertar detalle de orden
+                                stmtDetalles.run([
                                     orden_id, 
                                     prod.producto_id, 
                                     prod.cantidad, 
@@ -183,11 +208,19 @@ router.post('/', (req, res) => {
                                     prod.notas || '',
                                     usuario_id
                                 ]);
+
+                                // Actualizar stock
+                                stmtStock.run([
+                                    prod.cantidad,
+                                    usuario_id,
+                                    prod.producto_id
+                                ]);
                             });
                             
-                            stmt.finalize();
+                            stmtDetalles.finalize();
+                            stmtStock.finalize();
                             
-                            // Actualizar estado de la mesa
+                            // 4. Actualizar estado de la mesa
                             db.run(
                                 'UPDATE mesas SET estado = "ocupada" WHERE id = ?',
                                 [mesa_id],
@@ -230,18 +263,22 @@ router.post('/:id/cancelar', (req, res) => {
         db.run('BEGIN TRANSACTION');
 
         try {
-            // 1. Obtener la mesa_id de la orden
-            db.get(
-                'SELECT mesa_id FROM ordenes WHERE id = ? AND estado = "activa"',
+            // 1. Obtener la orden y sus detalles
+            db.all(
+                `SELECT d.producto_id, d.cantidad, m.id as mesa_id
+                FROM ordenes o
+                JOIN detalles_orden d ON o.id = d.orden_id
+                JOIN mesas m ON o.mesa_id = m.id
+                WHERE o.id = ? AND o.estado = "activa"`,
                 [id],
-                function(err, orden) {
+                function(err, detalles) {
                     if (err) {
                         console.error('Error al buscar orden:', err);
                         db.run('ROLLBACK');
                         return res.status(500).json({ error: 'Error al buscar la orden' });
                     }
 
-                    if (!orden) {
+                    if (!detalles || detalles.length === 0) {
                         db.run('ROLLBACK');
                         return res.status(404).json({ error: 'Orden no encontrada o no está activa' });
                     }
@@ -262,10 +299,29 @@ router.post('/:id/cancelar', (req, res) => {
                                 return res.status(500).json({ error: 'Error al cancelar la orden' });
                             }
 
-                            // 3. Actualizar estado de la mesa
+                            // 3. Restaurar stock
+                            const stmtStock = db.prepare(`
+                                UPDATE productos 
+                                SET stock = stock + ?, 
+                                    actualizado_por = ?,
+                                    fecha_actualizacion = CURRENT_TIMESTAMP
+                                WHERE id = ?
+                            `);
+
+                            detalles.forEach(detalle => {
+                                stmtStock.run([
+                                    detalle.cantidad,
+                                    usuario_id,
+                                    detalle.producto_id
+                                ]);
+                            });
+
+                            stmtStock.finalize();
+
+                            // 4. Actualizar estado de la mesa
                             db.run(
                                 'UPDATE mesas SET estado = "disponible" WHERE id = ?',
-                                [orden.mesa_id],
+                                [detalles[0].mesa_id],
                                 function(err) {
                                     if (err) {
                                         console.error('Error al actualizar mesa:', err);
@@ -415,6 +471,151 @@ router.post('/:id/pagar', (req, res) => {
             db.run('ROLLBACK');
             res.status(500).json({ error: 'Error al procesar el pago' });
         }
+    });
+});
+
+// Registrar pago individual
+router.post('/:id/pagar-individual', (req, res) => {
+    const { id } = req.params;
+    const { cliente_numero, monto, metodo_pago } = req.body;
+    const usuario_id = req.user?.id;
+
+    if (!usuario_id) {
+        return res.status(401).json({ error: 'Usuario no autenticado' });
+    }
+
+    if (!['efectivo', 'tarjeta', 'transferencia'].includes(metodo_pago)) {
+        return res.status(400).json({ error: 'Método de pago inválido' });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        try {
+            // 1. Verificar que la orden exista y esté activa
+            db.get(
+                'SELECT o.total, COALESCE(SUM(p.monto), 0) as total_pagado FROM ordenes o LEFT JOIN pagos_divididos p ON o.id = p.orden_id AND p.pagado = 1 WHERE o.id = ? AND o.estado = "activa" GROUP BY o.id',
+                [id],
+                function(err, orden) {
+                    if (err) {
+                        console.error('Error al buscar orden:', err);
+                        db.run('ROLLBACK');
+                        return res.status(500).json({ error: 'Error al buscar la orden' });
+                    }
+
+                    if (!orden) {
+                        db.run('ROLLBACK');
+                        return res.status(404).json({ error: 'Orden no encontrada o no está activa' });
+                    }
+
+                    // Verificar que el monto más lo ya pagado no exceda el total
+                    const nuevo_total_pagado = orden.total_pagado + monto;
+                    if (nuevo_total_pagado > orden.total) {
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ 
+                            error: 'El monto excede el saldo pendiente',
+                            saldo_pendiente: orden.total - orden.total_pagado
+                        });
+                    }
+
+                    // 2. Registrar el pago individual
+                    db.run(
+                        `INSERT INTO pagos_divididos (orden_id, cliente_numero, monto, metodo_pago, pagado, fecha_pago)
+                         VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)`,
+                        [id, cliente_numero, monto, metodo_pago],
+                        function(err) {
+                            if (err) {
+                                console.error('Error al registrar pago:', err);
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: 'Error al registrar el pago' });
+                            }
+
+                            // 3. Verificar si ya se pagó el total y actualizar estado de la orden
+                            if (Math.abs(nuevo_total_pagado - orden.total) < 0.01) {
+                                db.run(
+                                    `UPDATE ordenes 
+                                     SET estado = "cerrada",
+                                         fecha_actualizacion = CURRENT_TIMESTAMP,
+                                         fecha_cierre = CURRENT_TIMESTAMP
+                                     WHERE id = ?`,
+                                    [id],
+                                    function(err) {
+                                        if (err) {
+                                            console.error('Error al cerrar orden:', err);
+                                            db.run('ROLLBACK');
+                                            return res.status(500).json({ error: 'Error al actualizar estado de orden' });
+                                        }
+
+                                        // 4. Si la orden se cerró, actualizar estado de la mesa
+                                        db.run(
+                                            'UPDATE mesas SET estado = "disponible" WHERE id = (SELECT mesa_id FROM ordenes WHERE id = ?)',
+                                            [id],
+                                            function(err) {
+                                                if (err) {
+                                                    console.error('Error al actualizar mesa:', err);
+                                                    db.run('ROLLBACK');
+                                                    return res.status(500).json({ error: 'Error al actualizar estado de mesa' });
+                                                }
+
+                                                db.run('COMMIT');
+                                                res.json({
+                                                    message: 'Pago registrado exitosamente',
+                                                    orden_cerrada: true
+                                                });
+                                            }
+                                        );
+                                    }
+                                );
+                            } else {
+                                db.run('COMMIT');
+                                res.json({
+                                    message: 'Pago registrado exitosamente',
+                                    orden_cerrada: false,
+                                    saldo_pendiente: orden.total - nuevo_total_pagado
+                                });
+                            }
+                        }
+                    );
+                }
+            );
+        } catch (err) {
+            console.error('Error en transacción:', err);
+            db.run('ROLLBACK');
+            res.status(500).json({ error: 'Error al procesar el pago' });
+        }
+    });
+});
+
+// Obtener resumen de pagos de una orden
+router.get('/:id/pagos', (req, res) => {
+    const { id } = req.params;
+    
+    const query = `
+        SELECT 
+            p.cliente_numero,
+            p.monto,
+            p.metodo_pago,
+            p.pagado,
+            datetime(p.fecha_pago, 'localtime') as fecha_pago,
+            o.total as total_orden,
+            (SELECT COALESCE(SUM(monto), 0) FROM pagos_divididos WHERE orden_id = o.id AND pagado = 1) as total_pagado
+        FROM pagos_divididos p
+        JOIN ordenes o ON p.orden_id = o.id
+        WHERE p.orden_id = ?
+        ORDER BY p.cliente_numero
+    `;
+
+    db.all(query, [id], (err, pagos) => {
+        if (err) {
+            console.error('Error al obtener pagos:', err);
+            return res.status(500).json({ error: 'Error al obtener resumen de pagos' });
+        }
+
+        res.json({
+            pagos,
+            total_orden: pagos[0]?.total_orden || 0,
+            total_pagado: pagos[0]?.total_pagado || 0
+        });
     });
 });
 

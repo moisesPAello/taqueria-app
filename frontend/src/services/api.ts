@@ -1,3 +1,5 @@
+import { OrdenRequest, OrdenPagoRequest } from '../types';
+
 // Obtener la URL base de la API desde variables de entorno
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -188,7 +190,7 @@ export const ordenesService = {
   },
   
   // Pagar una orden
-  pagar: async (id: number, data: { metodo_pago: 'efectivo' | 'tarjeta' | 'transferencia'; notas?: string }) => {
+  pagar: async (id: number, data: OrdenPagoRequest) => {
     return fetchWithAuth(`/ordenes/${id}/pagar`, {
       method: 'POST',
       body: JSON.stringify(data)
@@ -205,5 +207,22 @@ export const ordenesService = {
       method: 'POST',
       body: JSON.stringify({ productos })
     });
+  },
+
+  // Registrar pago individual
+  pagarIndividual: async (id: number, data: { 
+    cliente_numero: number;
+    monto: number;
+    metodo_pago: 'efectivo' | 'tarjeta' | 'transferencia';
+  }) => {
+    return fetchWithAuth(`/ordenes/${id}/pagar-individual`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  // Obtener resumen de pagos
+  obtenerPagos: async (id: number) => {
+    return fetchWithAuth(`/ordenes/${id}/pagos`);
   }
 };

@@ -1,5 +1,6 @@
--- Crear tabla pagos_divididos
-CREATE TABLE IF NOT EXISTS pagos_divididos (
+DROP TABLE IF EXISTS pagos_divididos;
+
+CREATE TABLE pagos_divididos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     orden_id INTEGER NOT NULL,
     cliente_numero INTEGER NOT NULL,
