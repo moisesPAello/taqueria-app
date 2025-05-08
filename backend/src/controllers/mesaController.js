@@ -61,7 +61,7 @@ class MesaController {
             const { estado } = req.body;
             const usuarioActual = req.user?.id || 1; // Fallback para desarrollo
 
-            if (!['disponible', 'ocupada', 'en_servicio', 'mantenimiento'].includes(estado)) {
+            if (!['disponible', 'ocupada', 'mantenimiento'].includes(estado)) {
                 return res.status(400).json({ error: 'Estado no válido' });
             }
             

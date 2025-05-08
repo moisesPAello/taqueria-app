@@ -53,7 +53,6 @@ router.get('/stats', async (req, res) => {
                 SELECT 
                     SUM(CASE WHEN estado = 'disponible' THEN 1 ELSE 0 END) as disponibles,
                     SUM(CASE WHEN estado = 'ocupada' THEN 1 ELSE 0 END) as ocupadas,
-                    SUM(CASE WHEN estado = 'en_servicio' THEN 1 ELSE 0 END) as en_servicio,
                     SUM(CASE WHEN estado = 'mantenimiento' THEN 1 ELSE 0 END) as mantenimiento
                 FROM mesas
             `, [], (err, tableStats) => {

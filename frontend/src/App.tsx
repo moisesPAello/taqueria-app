@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  BrowserRouter as Router, 
+  BrowserRouter, 
   Routes, 
   Route, 
   Link, 
@@ -15,13 +15,11 @@ import ProtectedRoute from './components/features/auth/ProtectedRoute';
 import MesasList from './components/features/mesas/MesasList';
 import ProductosList from './components/features/productos/ProductosList';
 import CrearOrden from './components/features/ordenes/CrearOrden';
-import OrdenesList from './components/features/ordenes/OrdenesList';
 import Dashboard from './components/features/Dashboard';
-import OrdenDetalles from './components/features/ordenes/OrdenDetalles';
 import OrdenesAdmin from './components/features/ordenes/OrdenesAdmin';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { pathname } = useLocation(); // Obtiene la ruta actual
+  const { pathname } = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -65,7 +63,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     to="/admin/ordenes"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/admin/ordenes')}`}
                   >
-                    Administrar Órdenes
+                    Órdenes
                   </Link>
                 ) : (
                   <Link
@@ -108,98 +106,69 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router
-        future={{ 
-          v7_startTransition: true,
-          v7_relativeSplatPath: true
-        }}
-      >
+      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route
-            path="/mesas"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <MesasList />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/productos"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <ProductosList />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ordenes"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <OrdenesList />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ordenes/nueva"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <CrearOrden />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ordenes/:id"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <OrdenDetalles />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/ordenes"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <Layout>
-                  <OrdenesAdmin />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <Layout>
-                  <div>Panel de Administración (Próximamente)</div>
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="login" element={<Login />} />
+          <Route path="register" element={<Register />} />
+          <Route path="dashboard" element={
+            <ProtectedRoute>
+              <Layout>
+                <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/" element={<Navigate to="dashboard" />} />
+          <Route path="mesas" element={
+            <ProtectedRoute>
+              <Layout>
+                <MesasList />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="productos" element={
+            <ProtectedRoute>
+              <Layout>
+                <ProductosList />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="ordenes" element={
+            <ProtectedRoute>
+              <Layout>
+                <OrdenesAdmin />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="ordenes/nueva" element={
+            <ProtectedRoute>
+              <Layout>
+                <CrearOrden />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="ordenes/:id" element={
+            <ProtectedRoute>
+              <Layout>
+                <OrdenesAdmin />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="admin/ordenes" element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <OrdenesAdmin />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="admin" element={
+            <ProtectedRoute requiredRole="admin">
+              <Layout>
+                <div>Panel de Administración (Próximamente)</div>
+              </Layout>
+            </ProtectedRoute>
+          } />
         </Routes>
-      </Router>
+      </BrowserRouter>
     </AuthProvider>
   );
 }

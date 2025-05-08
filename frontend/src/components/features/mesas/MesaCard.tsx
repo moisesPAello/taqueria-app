@@ -5,7 +5,7 @@ interface Mesa {
   id: number;
   numero: number;
   capacidad: number;
-  estado: 'disponible' | 'ocupada' | 'en_servicio' | 'mantenimiento';
+  estado: 'disponible' | 'ocupada' | 'mantenimiento';
   mesero_nombre?: string;
   mesero_id?: number;
   orden_actual?: number;
@@ -37,8 +37,6 @@ const MesaCard: React.FC<MesaCardProps> = ({
         return 'border-green-500 bg-green-50';
       case 'ocupada':
         return 'border-red-500 bg-red-50';
-      case 'en_servicio':
-        return 'border-yellow-500 bg-yellow-50';
       case 'mantenimiento':
         return 'border-gray-500 bg-gray-50';
       default:
@@ -58,12 +56,6 @@ const MesaCard: React.FC<MesaCardProps> = ({
         return (
           <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
-      case 'en_servicio':
-        return (
-          <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
         );
       default:
@@ -143,7 +135,7 @@ const MesaCard: React.FC<MesaCardProps> = ({
           </button>
         )}
 
-        {(mesa.estado === 'ocupada' || mesa.estado === 'en_servicio') && (
+        {mesa.estado === 'ocupada' && (
           <button
             onClick={() => mesa.orden_actual && navigate(`/ordenes/${mesa.orden_actual}`)}
             className="w-full bg-accent text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"

@@ -4,7 +4,7 @@ interface Mesa {
   id: number;
   numero: number;
   capacidad: number;
-  estado: 'disponible' | 'ocupada' | 'en_servicio' | 'mantenimiento';
+  estado: 'disponible' | 'ocupada' | 'mantenimiento';
   mesero_id?: number;
   mesero_nombre?: string;
   orden_actual?: number;

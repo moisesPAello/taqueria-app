@@ -112,7 +112,8 @@ router.get('/:id', (req, res) => {
                     'id', p.id,
                     'nombre', p.nombre,
                     'precio', d.precio_unitario,
-                    'cantidad', d.cantidad
+                    'cantidad', d.cantidad,
+                    'notas', d.notas
                 )
             ) as productos
         FROM ordenes o
@@ -135,10 +136,20 @@ router.get('/:id', (req, res) => {
             return;
         }
 
-        // Parsear el array de productos que viene como string
-        orden.productos = JSON.parse(orden.productos);
+        // Format the response
+        const formattedOrden = {
+            ...orden,
+            mesa: orden.mesa_numero ? { numero: orden.mesa_numero } : null,
+            mesero: orden.mesero_nombre || 'No asignado',
+            productos: JSON.parse(orden.productos || '[]').filter(p => p.id !== null),
+            hora: orden.fecha_creacion,
+            total: parseFloat(orden.total).toFixed(2)
+        };
+
+        delete formattedOrden.mesa_numero;
+        delete formattedOrden.mesero_nombre;
         
-        res.json(orden);
+        res.json(formattedOrden);
     });
 });
 
@@ -360,6 +371,117 @@ router.post('/:id/pagar', (req, res) => {
 
                                     db.run('COMMIT');
                                     res.json({ message: 'Orden pagada exitosamente' });
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        } catch (err) {
+            db.run('ROLLBACK');
+            res.status(500).json({ error: err.message });
+        }
+    });
+});
+
+// Cancelar orden
+router.post('/:id/cancelar', (req, res) => {
+    const { id } = req.params;
+    
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        try {
+            // Verificar que la orden exista y esté activa
+            db.get(
+                'SELECT estado, mesa_id FROM ordenes WHERE id = ?',
+                [id],
+                (err, orden) => {
+                    if (err) {
+                        db.run('ROLLBACK');
+                        return res.status(500).json({ error: err.message });
+                    }
+
+                    if (!orden) {
+                        db.run('ROLLBACK');
+                        return res.status(404).json({ error: 'Orden no encontrada' });
+                    }
+
+                    if (orden.estado !== 'activa') {
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ 
+                            error: 'No se puede cancelar la orden. La orden no está activa' 
+                        });
+                    }
+
+                    // Actualizar estado de la orden
+                    db.run(
+                        'UPDATE ordenes SET estado = "cancelada", fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
+                        [id],
+                        function(err) {
+                            if (err) {
+                                db.run('ROLLBACK');
+                                return res.status(500).json({ error: err.message });
+                            }
+
+                            // Devolver el stock de los productos
+                            db.all(
+                                `SELECT producto_id, cantidad 
+                                FROM detalles_orden 
+                                WHERE orden_id = ?`,
+                                [id],
+                                (err, detalles) => {
+                                    if (err) {
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ error: err.message });
+                                    }
+
+                                    const stmtStock = db.prepare(`
+                                        UPDATE productos 
+                                        SET stock = stock + ?,
+                                            fecha_actualizacion = CURRENT_TIMESTAMP
+                                        WHERE id = ?
+                                    `);
+
+                                    const stmtMovimiento = db.prepare(`
+                                        INSERT INTO movimientos_inventario (
+                                            producto_id, tipo, cantidad, motivo, 
+                                            orden_id, usuario_id
+                                        ) VALUES (?, 'entrada', ?, 'Cancelación de orden', ?, ?)
+                                    `);
+
+                                    try {
+                                        detalles.forEach(detalle => {
+                                            stmtStock.run([detalle.cantidad, detalle.producto_id]);
+                                            stmtMovimiento.run([
+                                                detalle.producto_id, 
+                                                detalle.cantidad, 
+                                                id,
+                                                req.user?.id || 1 // Usuario actual o fallback
+                                            ]);
+                                        });
+
+                                        stmtStock.finalize();
+                                        stmtMovimiento.finalize();
+
+                                        // Liberar la mesa
+                                        db.run(
+                                            'UPDATE mesas SET estado = "disponible" WHERE id = ?',
+                                            [orden.mesa_id],
+                                            function(err) {
+                                                if (err) {
+                                                    db.run('ROLLBACK');
+                                                    return res.status(500).json({ error: err.message });
+                                                }
+
+                                                db.run('COMMIT');
+                                                res.json({ message: 'Orden cancelada exitosamente' });
+                                            }
+                                        );
+                                    } catch (err) {
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ error: 'Error al procesar la cancelación' });
+                                    }
                                 }
                             );
                         }

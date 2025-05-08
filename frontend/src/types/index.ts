@@ -39,6 +39,14 @@ export interface OrdenPagoRequest {
     pagos_divididos?: PagoDividido[];
 }
 
+interface ProductoEnOrden {
+    id: number;
+    nombre: string;
+    cantidad: number;
+    precio: number;
+    notas?: string;
+}
+
 export interface OrdenResponse {
     id: number;
     mesa: {
@@ -46,10 +54,12 @@ export interface OrdenResponse {
     };
     mesero: string;
     total: string;
-    productos: number;
+    productos: ProductoEnOrden[];
     hora: string;
-    estado: 'activa' | 'pagada' | 'cerrada' | 'cancelada';
+    estado: 'activa' | 'cerrada' | 'cancelada';
     metodo_pago?: string;
     notas?: string;
     fecha_cierre?: string;
+    fecha_creacion?: string;
+    num_personas?: number;
 }

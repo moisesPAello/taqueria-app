@@ -42,7 +42,6 @@ interface DashboardStats {
   mesasStatus: {
     disponibles: number;
     ocupadas: number;
-    enServicio: number;
     mantenimiento: number;
   };
 }
@@ -70,7 +69,6 @@ const Dashboard: React.FC = () => {
     mesasStatus: {
       disponibles: 0,
       ocupadas: 0,
-      enServicio: 0,
       mantenimiento: 0
     }
   });
@@ -109,7 +107,6 @@ const Dashboard: React.FC = () => {
           mesasStatus: {
             disponibles: Number(data.mesasStatus?.disponibles) || 0,
             ocupadas: Number(data.mesasStatus?.ocupadas) || 0,
-            enServicio: Number(data.mesasStatus?.enServicio) || 0,
             mantenimiento: Number(data.mesasStatus?.mantenimiento) || 0
           }
         });
@@ -257,10 +254,6 @@ const Dashboard: React.FC = () => {
               <p className="text-xl font-bold text-red-500">{stats.mesasStatus?.ocupadas || 0}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">En Servicio</p>
-              <p className="text-xl font-bold text-yellow-500">{stats.mesasStatus?.enServicio || 0}</p>
-            </div>
-            <div>
               <p className="text-sm text-gray-500">Mantenimiento</p>
               <p className="text-xl font-bold text-gray-500">{stats.mesasStatus?.mantenimiento || 0}</p>
             </div>
@@ -296,31 +289,60 @@ const Dashboard: React.FC = () => {
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800">Órdenes Activas</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mesa</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mesero</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Productos</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hora</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {ordenesActivas.map((orden) => (
-                <tr key={orden.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">#{orden.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Mesa {orden.mesa}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{orden.mesero}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{orden.productos}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">${Number(orden.total).toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatearHora(orden.hora)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {ordenesActivas.length === 0 ? (
+              <div className="col-span-full text-center py-8 text-gray-500">
+                No hay órdenes activas en este momento
+              </div>
+            ) : (
+              ordenesActivas.map((orden) => (
+                <div 
+                  key={orden.id}
+                  className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200"
+                >
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="text-sm font-semibold text-gray-600">Orden #{orden.id}</span>
+                        <h3 className="text-lg font-bold text-gray-900">Mesa {orden.mesa}</h3>
+                      </div>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Activa
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Mesero</span>
+                        <span className="font-medium text-gray-900">{orden.mesero}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Productos</span>
+                        <span className="font-medium text-gray-900">{orden.productos}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Hora</span>
+                        <span className="font-medium text-gray-900">{formatearHora(orden.hora)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                      <span className="text-2xl font-bold text-indigo-600">${Number(orden.total).toFixed(2)}</span>
+                      <div className="flex space-x-2">
+                        <button 
+                          className="px-3 py-1 text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors"
+                          onClick={() => window.location.href = `/ordenes/${orden.id}`}
+                        >
+                          Ver Detalles
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

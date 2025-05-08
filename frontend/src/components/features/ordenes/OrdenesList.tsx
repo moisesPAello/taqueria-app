@@ -63,7 +63,10 @@ const OrdenesList: React.FC = () => {
   const handleCerrarOrden = async (id: number) => {
     try {
       setLoading(true);
-      await ordenesService.cerrar(id);
+      await ordenesService.pagar(id, {
+        metodo_pago: 'efectivo', // Default to efectivo for quick close
+        notas: 'Cerrado desde lista de órdenes'
+      });
       mostrarNotificacion('success', 'Orden cerrada exitosamente');
       await cargarOrdenes();
     } catch (err) {
