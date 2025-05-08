@@ -88,7 +88,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8"> Fondo lado izquierdo
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
@@ -116,8 +116,8 @@ const Login: React.FC = () => {
                 required
                 className={`appearance-none rounded-none relative block w-full px-3 py-2 border 
                   ${errors.email ? 'border-red-300' : 'border-gray-300'}
-                  placeholder-gray-500 text-gray-900 rounded-t-md 
-                  focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                  placeholder-gray-500 text-white rounded-t-md 
+                  focus:outline-none focus:ring-indigo-500 focus:border-black focus:z-10 sm:text-sm`}
                 placeholder="Correo electrónico"
                 value={formData.email}
                 onChange={handleChange}
@@ -142,8 +142,8 @@ const Login: React.FC = () => {
                 required
                 className={`appearance-none rounded-none relative block w-full px-3 py-2 border 
                   ${errors.password ? 'border-red-300' : 'border-gray-300'}
-                  placeholder-gray-500 text-gray-900 rounded-b-md
-                  focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm`}
+                  placeholder-gray-500 text-white rounded-b-md
+                  focus:outline-none focus:ring-indigo-500 focus:border-black focus:z-10 sm:text-sm`}
                 placeholder="Contraseña"
                 value={formData.password}
                 onChange={handleChange}
