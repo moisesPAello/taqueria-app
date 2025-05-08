@@ -20,23 +20,6 @@
   }
 }
 
-/* Resto de tus estilos personalizados aquí */
-
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 500;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
 @layer base {
   select {
     @apply bg-[#ffffff] border border-black;
@@ -71,6 +54,53 @@
     @apply bg-[#ffffff] border-black;
   }
 }
+
+
+
+@layer base {
+  input[type="date"] {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  input[type="number"]:hover,
+  input[type="number"]:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+@layer base {
+  textarea {
+    @apply bg-[#FFFFFF] border border-black;
+  }
+
+  textarea:hover,
+  textarea:focus {
+    @apply bg-[#FFFFFF] border-black;
+  }
+}
+
+
+
+
+
+/* Resto de tus estilos personalizados aquí */
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 500;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
 
 
 
