@@ -108,25 +108,6 @@ class MesaModel {
             );
         });
     }
-
-    // Liberar mesa
-    static async liberar(mesaId, usuarioActual) {
-        return new Promise((resolve, reject) => {
-            db.run(
-                `UPDATE mesas 
-                SET estado = 'disponible',
-                    mesero_id = NULL,
-                    actualizado_por = ?,
-                    fecha_actualizacion = CURRENT_TIMESTAMP
-                WHERE id = ?`,
-                [usuarioActual, mesaId],
-                function(err) {
-                    if (err) return reject(err);
-                    resolve({ changes: this.changes });
-                }
-            );
-        });
-    }
 }
 
 module.exports = MesaModel;

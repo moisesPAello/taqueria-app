@@ -1,15 +1,5 @@
 import React, { useState } from 'react';
-
-interface Producto {
-  id: number;
-  nombre: string;
-  descripcion: string;
-  precio: number;
-  categoria: string;
-  imagen?: string;
-  stock: number;
-  stock_minimo: number;
-}
+import { Producto } from '../../../types';
 
 interface ProductoCardProps {
   producto: Producto;
@@ -27,14 +17,39 @@ const ProductoCard: React.FC<ProductoCardProps> = ({
   isAdmin = false
 }) => {
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [cantidad, setCantidad] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const handleActualizarStock = () => {
-    if (onActualizarStock) {
-      onActualizarStock(producto.id, cantidad);
-      setShowStockModal(false);
-      setCantidad(0);
+    if (!onActualizarStock) return;
+
+    // Validar cambios significativos en el stock
+    if (cantidad < 0 && Math.abs(cantidad) > producto.stock * 0.5) {
+      setShowConfirmModal(true);
+      return;
     }
+
+    proceedWithStockUpdate();
+  };
+
+  const proceedWithStockUpdate = () => {
+    if (!onActualizarStock) return;
+
+    onActualizarStock(producto.id, cantidad);
+    setShowStockModal(false);
+    setShowConfirmModal(false);
+    setCantidad(0);
+    setError(null);
+  };
+
+  const handleCantidadChange = (value: number) => {
+    if (value < -producto.stock) {
+      setError('No puede reducir más del stock actual');
+      return;
+    }
+    setError(null);
+    setCantidad(value);
   };
 
   const getStockStatusColor = () => {
@@ -44,13 +59,13 @@ const ProductoCard: React.FC<ProductoCardProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+    <div className="relative bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       {producto.imagen && (
         <div className="h-48 w-full bg-gray-200">
           <img
             src={producto.imagen}
             alt={producto.nombre}
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover ${!producto.disponible || producto.stock <= 0 ? 'filter grayscale opacity-50' : ''}`}
           />
         </div>
       )}
@@ -78,6 +93,11 @@ const ProductoCard: React.FC<ProductoCardProps> = ({
               `Stock: ${producto.stock} unidades`
             )}
           </div>
+          {!producto.disponible && producto.stock > 0 && (
+            <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              Temporalmente no disponible
+            </div>
+          )}
         </div>
 
         {isAdmin && (
@@ -114,41 +134,54 @@ const ProductoCard: React.FC<ProductoCardProps> = ({
           <div className="bg-white rounded-lg p-6 max-w-sm w-full">
             <h3 className="text-lg font-semibold mb-4">Actualizar Stock - {producto.nombre}</h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Stock Actual: {producto.stock}
-              </label>
+              <div className="flex justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">Stock Actual:</label>
+                <span className="font-medium">{producto.stock}</span>
+              </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCantidad(prev => Math.max(-producto.stock, prev - 1))}
-                  className="px-3 py-1 bg-gray-200 rounded-lg hover:bg-gray-300"
+                  onClick={() => handleCantidadChange(cantidad - 1)}
+                  className="px-3 py-1 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+                  disabled={cantidad <= -producto.stock}
                 >
                   -
                 </button>
                 <input
                   type="number"
                   value={cantidad}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value) || 0;
-                    setCantidad(Math.max(-producto.stock, value));
-                  }}
-                  className="block w-20 text-center border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                  onChange={(e) => handleCantidadChange(parseInt(e.target.value) || 0)}
+                  className="block w-24 text-center border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                 />
                 <button
-                  onClick={() => setCantidad(prev => prev + 1)}
+                  onClick={() => handleCantidadChange(cantidad + 1)}
                   className="px-3 py-1 bg-gray-200 rounded-lg hover:bg-gray-300"
                 >
                   +
                 </button>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Nuevo stock total: {producto.stock + cantidad}
-              </p>
+              {error && (
+                <p className="mt-2 text-sm text-red-600">{error}</p>
+              )}
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <div className="flex justify-between text-sm">
+                  <span>Nuevo stock total:</span>
+                  <span className={`font-medium ${producto.stock + cantidad <= producto.stock_minimo ? 'text-yellow-600' : ''}`}>
+                    {producto.stock + cantidad} unidades
+                  </span>
+                </div>
+                {producto.stock + cantidad <= producto.stock_minimo && (
+                  <p className="mt-2 text-sm text-yellow-600">
+                    ⚠️ Este ajuste dejará el stock por debajo del mínimo ({producto.stock_minimo} unidades)
+                  </p>
+                )}
+              </div>
             </div>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowStockModal(false);
                   setCantidad(0);
+                  setError(null);
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
@@ -156,10 +189,38 @@ const ProductoCard: React.FC<ProductoCardProps> = ({
               </button>
               <button
                 onClick={handleActualizarStock}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-                disabled={cantidad === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                disabled={cantidad === 0 || !!error}
               >
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-red-600 mb-2">¿Confirmar reducción significativa?</h3>
+              <p className="text-gray-600">
+                Está por reducir el stock en {Math.abs(cantidad)} unidades ({Math.round(Math.abs(cantidad) / producto.stock * 100)}% del stock actual).
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={proceedWithStockUpdate}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+              >
+                Confirmar
               </button>
             </div>
           </div>

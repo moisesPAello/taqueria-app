@@ -77,25 +77,6 @@ class MesaController {
             res.status(500).json({ error: 'Error al actualizar estado' });
         }
     }
-
-    // Liberar mesa
-    static async liberarMesa(req, res) {
-        try {
-            const { id } = req.params;
-            const usuarioActual = req.user?.id || 1; // Fallback para desarrollo
-            
-            const result = await MesaModel.liberar(id, usuarioActual);
-            
-            if (result.changes === 0) {
-                return res.status(404).json({ error: 'Mesa no encontrada' });
-            }
-            
-            res.json({ message: 'Mesa liberada exitosamente', mesaId: id });
-        } catch (err) {
-            console.error('Error al liberar mesa:', err);
-            res.status(500).json({ error: 'Error al liberar mesa' });
-        }
-    }
 }
 
 module.exports = MesaController;

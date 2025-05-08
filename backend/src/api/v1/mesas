@@ -14,7 +14,4 @@ router.post('/:id/asignar-mesero', MesaController.asignarMesero);
 // Actualizar estado de mesa
 router.put('/:id/estado', MesaController.actualizarEstado);
 
-// Liberar mesa
-router.post('/:id/liberar', MesaController.liberarMesa);
-
 module.exports = router;

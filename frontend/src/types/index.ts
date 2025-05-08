@@ -1,13 +1,13 @@
 export interface Producto {
     id: number;
     nombre: string;
+    descripcion: string;
     precio: number;
     categoria: string;
-    descripcion?: string;
+    imagen?: string;
     stock: number;
     stock_minimo: number;
     disponible: boolean;
-    imagen?: string;
 }
 
 export interface ProductoOrden {

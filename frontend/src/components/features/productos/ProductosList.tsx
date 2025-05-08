@@ -1,17 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import ProductoCard from './ProductoCard';
 import { useAuth } from '../../../context/AuthContext';
-
-interface Producto {
-  id: number;
-  nombre: string;
-  descripcion: string;
-  precio: number;
-  categoria: string;
-  imagen?: string;
-  stock: number;
-  stock_minimo: number;
-}
+import EditarProductoModal from './EditarProductoModal';
+import { Producto } from '../../../types';
+import { productosService } from '../../../services/api';
 
 const ProductosList: React.FC = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -20,25 +12,16 @@ const ProductosList: React.FC = () => {
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>('');
   const [disponibilidadFiltro, setDisponibilidadFiltro] = useState<'todos' | 'disponibles' | 'agotados' | 'stock_bajo'>('todos');
   const [categorias, setCategorias] = useState<string[]>([]);
-  const { token, user } = useAuth();
+  const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
+  const { user } = useAuth();
 
   const fetchProductos = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/productos', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar los productos');
-      }
-      
-      const data = await response.json();
+      const data = await productosService.getAll();
       setProductos(data);
-      
       const categoriasUnicas = [...new Set(data.map((p: Producto) => p.categoria))] as string[];
       setCategorias(categoriasUnicas);
+      setError('');
     } catch (err) {
       setError('Error al cargar los productos');
       console.error(err);
@@ -53,18 +36,9 @@ const ProductosList: React.FC = () => {
 
   const handleEliminarProducto = async (productoId: number) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/productos/${productoId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar el producto');
-      }
-
+      await productosService.delete(productoId);
       setProductos(productos.filter(p => p.id !== productoId));
+      setError('');
     } catch (err) {
       setError('Error al eliminar el producto');
       console.error(err);
@@ -72,32 +46,43 @@ const ProductosList: React.FC = () => {
   };
 
   const handleEditarProducto = (producto: Producto) => {
-    // TODO: Implementar edición de producto
-    console.log('Editar producto:', producto);
+    setProductoEditando(producto);
+  };
+
+  const handleGuardarProducto = async (productoData: Partial<Producto>) => {
+    try {
+      if (!productoEditando?.id) return;
+
+      // Validate and sanitize data
+      const datosActualizados = {
+        nombre: productoData.nombre?.trim(),
+        descripcion: productoData.descripcion?.trim(),
+        precio: Number(productoData.precio),
+        categoria: productoData.categoria?.trim(),
+        stock_minimo: Number(productoData.stock_minimo),
+        disponible: Boolean(productoData.disponible)
+      };
+
+      // Validate required fields
+      if (!datosActualizados.nombre || !datosActualizados.categoria || isNaN(datosActualizados.precio)) {
+        throw new Error('Faltan campos requeridos o son inválidos');
+      }
+
+      await productosService.update(productoEditando.id, datosActualizados);
+      await fetchProductos();
+      setProductoEditando(null);
+    } catch (err) {
+      throw err instanceof Error ? err : new Error('Error al guardar el producto');
+    }
   };
 
   const handleActualizarStock = async (productoId: number, cantidad: number) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/productos/${productoId}/stock`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          cantidad,
-          tipo: cantidad >= 0 ? 'entrada' : 'salida',
-          motivo: 'Ajuste manual de inventario'
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al actualizar el stock');
-      }
-
-      await fetchProductos(); // Recargar productos para obtener el nuevo stock
+      await productosService.updateStock(productoId, cantidad);
+      await fetchProductos();
+      setError('');
     } catch (err) {
-      setError('Error al actualizar el stock');
+      setError(err instanceof Error ? err.message : 'Error al actualizar el stock');
       console.error(err);
     }
   };
@@ -214,6 +199,15 @@ const ProductosList: React.FC = () => {
           />
         ))}
       </div>
+      
+      {productoEditando && (
+        <EditarProductoModal
+          producto={productoEditando}
+          categorias={categorias}
+          onSave={handleGuardarProducto}
+          onClose={() => setProductoEditando(null)}
+        />
+      )}
     </div>
   );
 };

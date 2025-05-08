@@ -13,4 +13,134 @@ router.get('/', (req, res) => {
     });
 });
 
+// Obtener un producto específico
+router.get('/:id', (req, res) => {
+    const { id } = req.params;
+    db.get('SELECT * FROM productos WHERE id = ?', [id], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        if (!row) {
+            res.status(404).json({ error: 'Producto no encontrado' });
+            return;
+        }
+        res.json(row);
+    });
+});
+
+// Actualizar un producto
+router.put('/:id', (req, res) => {
+    const { id } = req.params;
+    const { nombre, descripcion, precio, categoria, disponible, stock_minimo } = req.body;
+    const usuarioActual = req.user?.id || 1; // Fallback para desarrollo
+
+    const query = `
+        UPDATE productos 
+        SET nombre = COALESCE(?, nombre),
+            descripcion = COALESCE(?, descripcion),
+            precio = COALESCE(?, precio),
+            categoria = COALESCE(?, categoria),
+            disponible = COALESCE(?, disponible),
+            stock_minimo = COALESCE(?, stock_minimo),
+            actualizado_por = ?,
+            fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `;
+
+    db.run(
+        query,
+        [nombre, descripcion, precio, categoria, disponible, stock_minimo, usuarioActual, id],
+        function(err) {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            if (this.changes === 0) {
+                res.status(404).json({ error: 'Producto no encontrado' });
+                return;
+            }
+            res.json({ 
+                message: 'Producto actualizado exitosamente',
+                changes: this.changes
+            });
+        }
+    );
+});
+
+// Actualizar stock de un producto
+router.post('/:id/stock', (req, res) => {
+    const { id } = req.params;
+    const { cantidad, tipo, motivo } = req.body;
+    const usuarioActual = req.user?.id || 1; // Fallback para desarrollo
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+
+        try {
+            // Primero verificamos el stock actual
+            db.get('SELECT stock FROM productos WHERE id = ?', [id], (err, producto) => {
+                if (err) {
+                    db.run('ROLLBACK');
+                    res.status(500).json({ error: err.message });
+                    return;
+                }
+
+                if (!producto) {
+                    db.run('ROLLBACK');
+                    res.status(404).json({ error: 'Producto no encontrado' });
+                    return;
+                }
+
+                // Calculamos el nuevo stock
+                const nuevoStock = producto.stock + cantidad;
+
+                // Verificamos que el stock no quede negativo
+                if (nuevoStock < 0) {
+                    db.run('ROLLBACK');
+                    res.status(400).json({ error: 'El stock no puede ser negativo' });
+                    return;
+                }
+
+                // Actualizamos el stock
+                db.run(
+                    'UPDATE productos SET stock = ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = ?',
+                    [nuevoStock, id],
+                    function(err) {
+                        if (err) {
+                            db.run('ROLLBACK');
+                            res.status(500).json({ error: err.message });
+                            return;
+                        }
+
+                        // Registramos el movimiento en el historial
+                        db.run(
+                            `INSERT INTO movimientos_inventario (
+                                producto_id, tipo, cantidad, motivo, usuario_id
+                            ) VALUES (?, ?, ?, ?, ?)`,
+                            [id, tipo, Math.abs(cantidad), motivo, usuarioActual],
+                            function(err) {
+                                if (err) {
+                                    db.run('ROLLBACK');
+                                    res.status(500).json({ error: err.message });
+                                    return;
+                                }
+
+                                db.run('COMMIT');
+                                res.json({ 
+                                    message: 'Stock actualizado exitosamente',
+                                    nuevoStock: nuevoStock
+                                });
+                            }
+                        );
+                    }
+                );
+            });
+        } catch (err) {
+            db.run('ROLLBACK');
+            res.status(500).json({ error: err.message });
+        }
+    });
+});
+
 module.exports = router;

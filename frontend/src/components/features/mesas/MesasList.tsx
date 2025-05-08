@@ -35,7 +35,6 @@ const MesasList: React.FC = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         }).then(res => res.json())
       ]);
-      
       setMesas(mesasData);
       setMeseros(meserosData);
       setError(null);
@@ -58,24 +57,6 @@ const MesasList: React.FC = () => {
       await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al asignar mesero');
-    }
-  };
-
-  const handleActualizarEstado = async (mesaId: number, estado: Mesa['estado']) => {
-    try {
-      await mesasService.actualizarEstado(mesaId, estado);
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al actualizar estado');
-    }
-  };
-
-  const handleLiberarMesa = async (mesaId: number) => {
-    try {
-      await mesasService.liberarMesa(mesaId);
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al liberar mesa');
     }
   };
 
@@ -115,8 +96,6 @@ const MesasList: React.FC = () => {
             mesa={mesa}
             meseros={meseros}
             onAsignarMesero={handleAsignarMesero}
-            onActualizarEstado={handleActualizarEstado}
-            onLiberar={handleLiberarMesa}
           />
         ))}
       </div>

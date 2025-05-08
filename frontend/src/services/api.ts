@@ -147,6 +147,18 @@ export const productosService = {
     return fetchWithAuth(`/productos/${id}`, {
       method: 'DELETE'
     });
+  },
+
+  // Actualizar stock de producto (solo admin)
+  updateStock: async (id: number, cantidad: number) => {
+    return fetchWithAuth(`/productos/${id}/stock`, {
+      method: 'POST',
+      body: JSON.stringify({
+        cantidad,
+        tipo: cantidad >= 0 ? 'entrada' : 'salida',
+        motivo: 'Ajuste manual de inventario'
+      })
+    });
   }
 };
 

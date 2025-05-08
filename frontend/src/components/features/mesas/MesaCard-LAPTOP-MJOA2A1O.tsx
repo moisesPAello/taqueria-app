@@ -21,12 +21,16 @@ interface MesaCardProps {
   mesa: Mesa;
   meseros: Mesero[];
   onAsignarMesero: (mesaId: number, meseroId: number) => void;
+  onActualizarEstado: (mesaId: number, estado: Mesa['estado']) => void;
+  onLiberar: (mesaId: number) => void;
 }
 
 const MesaCard: React.FC<MesaCardProps> = ({
   mesa,
   meseros,
-  onAsignarMesero
+  onAsignarMesero,
+  onActualizarEstado,
+  onLiberar
 }) => {
   const [showMeseros, setShowMeseros] = useState(false);
   const navigate = useNavigate();
@@ -144,12 +148,20 @@ const MesaCard: React.FC<MesaCardProps> = ({
         )}
 
         {(mesa.estado === 'ocupada' || mesa.estado === 'en_servicio') && (
-          <button
-            onClick={() => mesa.orden_actual && navigate(`/ordenes/${mesa.orden_actual}`)}
-            className="w-full bg-accent text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
-          >
-            Ver Orden Actual
-          </button>
+          <>
+            <button
+              onClick={() => mesa.orden_actual && navigate(`/ordenes/${mesa.orden_actual}`)}
+              className="w-full bg-accent text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+            >
+              Ver Orden Actual
+            </button>
+            <button
+              onClick={() => onLiberar(mesa.id)}
+              className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+            >
+              Liberar Mesa
+            </button>
+          </>
         )}
       </div>
     </div>
