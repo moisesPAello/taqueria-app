@@ -45,6 +45,22 @@
 
 
 @layer base {
+  input[type="email"],
+  input[type="password"] {
+    @apply bg-[#FFFFFF] border border-black;
+  }
+
+  input[type="email"]:hover,
+  input[type="email"]:focus,
+  input[type="password"]:hover,
+  input[type="password"]:focus {
+    @apply bg-[#FFFFFF] border-black;
+  }
+}
+
+
+
+@layer base {
   input[type="text"] {
     @apply bg-[#ffffff] border border-black;
   }
