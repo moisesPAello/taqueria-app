@@ -37,6 +37,43 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+@layer base {
+  select {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  select:hover,
+  select:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+
+@layer base {
+  input[type="number"] {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  input[type="number"]:hover,
+  input[type="number"]:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+
+@layer base {
+  input[type="text"] {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  input[type="number"]:hover,
+  input[type="number"]:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+
+
 a {
   font-weight: 500;
   color: #646cff;
