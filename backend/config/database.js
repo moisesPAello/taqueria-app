@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require('sqlite3');  // Remove .verbose()
 const path = require('path');
 
 // Configurar SQLite para usar UTC

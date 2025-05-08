@@ -62,6 +62,42 @@ router.get('/', (req, res) => {
     });
 });
 
+// Get active orders
+router.get('/activas', (req, res) => {
+    const query = `
+        SELECT 
+            o.id,
+            o.total,
+            o.estado,
+            o.fecha_creacion as hora,
+            m.numero as mesa,
+            u.nombre as mesero,
+            COUNT(d.id) as productos
+        FROM ordenes o
+        JOIN mesas m ON o.mesa_id = m.id
+        JOIN usuarios u ON o.usuario_id = u.id
+        LEFT JOIN detalles_orden d ON o.id = d.orden_id
+        WHERE o.estado = 'activa'
+        GROUP BY o.id
+        ORDER BY o.fecha_creacion DESC
+    `;
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('Error getting active orders:', err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        const formattedRows = rows.map(row => ({
+            ...row,
+            hora: new Date(row.hora).toISOString(),
+            total: parseFloat(row.total).toFixed(2)
+        }));
+
+        res.json(formattedRows);
+    });
+});
+
 // Añadir ruta para obtener detalles de una orden específica
 router.get('/:id', (req, res) => {
     const { id } = req.params;
@@ -240,35 +276,92 @@ router.post('/', (req, res) => {
 // Procesar pago de orden
 router.post('/:id/pagar', (req, res) => {
     const { id } = req.params;
-    const { metodo_pago, notas } = req.body;
+    const { metodo_pago, notas, pagos_divididos } = req.body;
+
+    if (!metodo_pago) {
+        return res.status(400).json({ error: 'El método de pago es requerido' });
+    }
 
     db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
         try {
-            db.run(
-                'UPDATE ordenes SET estado = "pagada", metodo_pago = ?, notas = ?, fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
-                [metodo_pago, notas || null, id],
-                function(err) {
+            // Verificar que la orden exista y esté activa
+            db.get(
+                'SELECT estado, total FROM ordenes WHERE id = ?',
+                [id],
+                (err, orden) => {
                     if (err) {
                         db.run('ROLLBACK');
                         return res.status(500).json({ error: err.message });
                     }
 
-                    // Liberar la mesa ya que la orden está pagada
+                    if (!orden) {
+                        db.run('ROLLBACK');
+                        return res.status(404).json({ error: 'Orden no encontrada' });
+                    }
+
+                    if (orden.estado !== 'activa') {
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ 
+                            error: 'No se puede procesar el pago. La orden no está activa' 
+                        });
+                    }
+
+                    // Si hay pagos divididos, validar que la suma sea igual al total
+                    if (pagos_divididos && pagos_divididos.length > 0) {
+                        const totalPagos = pagos_divididos.reduce((sum, pago) => sum + pago.monto, 0);
+                        if (Math.abs(totalPagos - orden.total) > 0.01) {
+                            db.run('ROLLBACK');
+                            return res.status(400).json({ 
+                                error: 'La suma de los pagos divididos debe ser igual al total de la orden' 
+                            });
+                        }
+                    }
+
+                    // Procesar el pago
                     db.run(
-                        `UPDATE mesas 
-                        SET estado = "disponible" 
-                        WHERE id = (SELECT mesa_id FROM ordenes WHERE id = ?)`,
-                        [id],
+                        'UPDATE ordenes SET estado = "cerrada", metodo_pago = ?, notas = ?, fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
+                        [metodo_pago, notas || null, id],
                         function(err) {
                             if (err) {
                                 db.run('ROLLBACK');
                                 return res.status(500).json({ error: err.message });
                             }
 
-                            db.run('COMMIT');
-                            res.json({ message: 'Orden pagada exitosamente' });
+                            // Liberar la mesa ya que la orden está pagada
+                            db.run(
+                                `UPDATE mesas 
+                                SET estado = "disponible" 
+                                WHERE id = (SELECT mesa_id FROM ordenes WHERE id = ?)`,
+                                [id],
+                                function(err) {
+                                    if (err) {
+                                        db.run('ROLLBACK');
+                                        return res.status(500).json({ error: err.message });
+                                    }
+
+                                    // Si hay pagos divididos, registrarlos
+                                    if (pagos_divididos && pagos_divididos.length > 0) {
+                                        const stmt = db.prepare(
+                                            'INSERT INTO pagos_divididos (orden_id, cliente_numero, monto, metodo_pago) VALUES (?, ?, ?, ?)'
+                                        );
+
+                                        try {
+                                            pagos_divididos.forEach(pago => {
+                                                stmt.run([id, pago.cliente_numero, pago.monto, pago.metodo_pago || metodo_pago]);
+                                            });
+                                            stmt.finalize();
+                                        } catch (err) {
+                                            db.run('ROLLBACK');
+                                            return res.status(500).json({ error: 'Error al registrar pagos divididos' });
+                                        }
+                                    }
+
+                                    db.run('COMMIT');
+                                    res.json({ message: 'Orden pagada exitosamente' });
+                                }
+                            );
                         }
                     );
                 }

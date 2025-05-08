@@ -9,13 +9,14 @@ const productosRoutes = require('./src/api/v1/productos');
 const ordenesRoutes = require('./src/api/v1/ordenes');
 const authRoutes = require('./src/api/v1/auth');
 const usuariosRoutes = require('./src/api/v1/usuarios');
+const dashboardRoutes = require('./src/api/v1/dashboard');
 
 const app = express();
 const PORT = 3000;
 
 // Global error handler para promesas no manejadas
 process.on('unhandledRejection', (reason, promise) => {
-    console.log('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Configuración de CORS
@@ -28,12 +29,6 @@ app.use(cors({
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Middleware para loggear requests
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-});
 
 // Middleware para manejar errores de JSON parsing
 app.use((err, req, res, next) => {
@@ -55,6 +50,7 @@ app.use('/api/productos', productosRoutes);
 app.use('/api/ordenes', ordenesRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Ruta de prueba
 app.get('/api/test', (req, res) => {
@@ -63,7 +59,7 @@ app.get('/api/test', (req, res) => {
 
 // Error handler global
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('Error:', err.message);
     res.status(500).json({
         error: 'Error interno del servidor',
         message: process.env.NODE_ENV === 'development' ? err.message : undefined

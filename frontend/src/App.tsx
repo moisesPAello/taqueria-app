@@ -1,5 +1,13 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
+import { 
+  BrowserRouter as Router, 
+  Routes, 
+  Route, 
+  Link, 
+  useNavigate, 
+  Navigate, 
+  useLocation
+} from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/features/auth/Login';
 import Register from './components/features/auth/Register';
@@ -52,12 +60,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 >
                   Productos
                 </Link>
-                <Link
-                  to="/ordenes"
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/ordenes')}`}
-                >
-                  Órdenes
-                </Link>
+                {user?.rol === 'admin' ? (
+                  <Link
+                    to="/admin/ordenes"
+                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/admin/ordenes')}`}
+                  >
+                    Administrar Órdenes
+                  </Link>
+                ) : (
+                  <Link
+                    to="/ordenes"
+                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive('/ordenes')}`}
+                  >
+                    Órdenes
+                  </Link>
+                )}
                 {user?.rol === 'admin' && (
                   <Link
                     to="/admin"
@@ -91,7 +108,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router
+        future={{ 
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

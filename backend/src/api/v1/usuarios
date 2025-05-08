@@ -14,8 +14,6 @@ router.get('/', (req, res) => {
         params.push(rol);
     }
     
-    console.log('Executing query:', query, 'with params:', params); // Debug log
-    
     db.all(query, params, (err, rows) => {
         if (err) {
             console.error('Error al obtener usuarios:', err);
@@ -24,7 +22,6 @@ router.get('/', (req, res) => {
 
         // Always return an array, even if empty
         const users = rows || [];
-        console.log('Users found:', users); // Debug log
         res.json(users);
     });
 });

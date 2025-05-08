@@ -21,6 +21,7 @@ interface Orden {
   notas?: string;
   num_personas: number;
   fecha_creacion: string;
+  fecha_cierre?: string;
   metodo_pago?: 'efectivo' | 'tarjeta' | 'transferencia';
 }
 
