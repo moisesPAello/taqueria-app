@@ -20,12 +20,75 @@
   }
 }
 
+@layer base {
+  select {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  select:hover,
+  select:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+
+@layer base {
+  input[type="number"] {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  input[type="number"]:hover,
+  input[type="number"]:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+
+@layer base {
+  input[type="text"] {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  input[type="number"]:hover,
+  input[type="number"]:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+
+
+@layer base {
+  input[type="date"] {
+    @apply bg-[#ffffff] border border-black;
+  }
+
+  input[type="number"]:hover,
+  input[type="number"]:focus {
+    @apply bg-[#ffffff] border-black;
+  }
+}
+
+@layer base {
+  textarea {
+    @apply bg-[#FFFFFF] border border-black;
+  }
+
+  textarea:hover,
+  textarea:focus {
+    @apply bg-[#FFFFFF] border-black;
+  }
+}
+
+
+
+
+
 /* Resto de tus estilos personalizados aquí */
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: 500;
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
@@ -36,6 +99,10 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+
+
+
 
 a {
   font-weight: 500;
@@ -66,7 +133,7 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #242424;
   cursor: pointer;
   transition: border-color 0.25s;
 }
