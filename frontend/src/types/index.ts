@@ -44,11 +44,12 @@ export interface OrdenResponse {
     mesa: {
         numero: number;
     };
-    mesero_nombre: string;
+    mesero: string;
     total: string;
     productos: number;
     hora: string;
-    estado: 'activa' | 'cerrada' | 'cancelada';
+    estado: 'activa' | 'pagada' | 'cerrada' | 'cancelada';
     metodo_pago?: string;
     notas?: string;
+    fecha_cierre?: string;
 }

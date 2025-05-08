@@ -26,10 +26,21 @@ const CrearOrden: React.FC = () => {
   const [numPersonas, setNumPersonas] = useState(1);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Verificar que tengamos la mesaId
+  // Verificar que tengamos la mesaId y meseroId
   useEffect(() => {
-    if (!state?.mesaId) {
-      navigate('/mesas');
+    if (!state) {
+      setError('No se puede acceder directamente a esta página. Por favor, seleccione una mesa primero.');
+      return;
+    }
+
+    if (!state.mesaId) {
+      setError('Error: No se ha especificado la mesa');
+      return;
+    }
+
+    if (!state.meseroId) {
+      setError('Error: No se ha asignado un mesero a la mesa');
+      return;
     }
   }, [state, navigate]);
 
@@ -136,6 +147,7 @@ const CrearOrden: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!state?.mesaId || !state?.meseroId) {
       setError('No se puede crear la orden: falta información de mesa o mesero');
       return;
@@ -148,7 +160,7 @@ const CrearOrden: React.FC = () => {
 
     try {
       setLoading(true);
-      await ordenesService.create({
+      const ordenData = {
         mesa_id: state.mesaId,
         mesero_id: state.meseroId,
         productos: productosSeleccionados.map(p => ({
@@ -158,7 +170,11 @@ const CrearOrden: React.FC = () => {
         })),
         notas: notas.trim() || undefined,
         num_personas: numPersonas
-      });
+      };
+
+      console.log('Enviando orden:', ordenData); // Para debugging
+
+      await ordenesService.create(ordenData);
       
       setNotification({
         type: 'success',
@@ -169,8 +185,17 @@ const CrearOrden: React.FC = () => {
         navigate('/mesas');
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al crear la orden');
+      const errorMessage = err instanceof Error ? err.message : 'Error al crear la orden';
       console.error('Error al crear orden:', err);
+      setError(errorMessage);
+      
+      // Mostrar más detalles del error si están disponibles
+      if (err instanceof Error && 'response' in err) {
+        const responseError = (err as any).response?.data?.error;
+        if (responseError) {
+          setError(`Error: ${responseError}`);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -283,25 +308,58 @@ const CrearOrden: React.FC = () => {
               {productosFiltrados.map(producto => (
                 <div
                   key={producto.id}
-                  className="border rounded-lg p-4 hover:shadow-lg transition-shadow bg-gray-50"
+                  className="relative bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   {producto.imagen && (
-                    <img
-                      src={producto.imagen}
-                      alt={producto.nombre}
-                      className="w-full h-32 object-cover rounded-lg mb-3"
-                    />
+                    <div className="h-48 w-full bg-gray-200">
+                      <img
+                        src={producto.imagen}
+                        alt={producto.nombre}
+                        className={`h-full w-full object-cover ${!producto.disponible || producto.stock <= 0 ? 'filter grayscale opacity-50' : ''}`}
+                      />
+                    </div>
                   )}
-                  <h3 className="font-medium text-lg">{producto.nombre}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{producto.descripcion}</p>
-                  <div className="flex justify-between items-center">
-                    <p className="text-lg font-bold text-indigo-600">${producto.precio.toFixed(2)}</p>
-                    <button
-                      onClick={() => handleAgregarProducto(producto)}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      Agregar
-                    </button>
+                  <div className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{producto.nombre}</h3>
+                        <p className="text-sm text-gray-500">{producto.categoria}</p>
+                      </div>
+                      <span className="text-lg font-bold text-indigo-600">
+                        ${producto.precio.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">{producto.descripcion}</p>
+                    <div className="mt-3">
+                      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        producto.stock <= 0 
+                          ? 'bg-red-100 text-red-800' 
+                          : producto.stock <= producto.stock_minimo 
+                            ? 'bg-yellow-100 text-yellow-800' 
+                            : 'bg-green-100 text-green-800'
+                      }`}>
+                        {producto.stock <= 0 
+                          ? 'Agotado' 
+                          : producto.stock <= producto.stock_minimo 
+                            ? `Stock Bajo: ${producto.stock} unidades`
+                            : `Stock: ${producto.stock} unidades`
+                        }
+                      </div>
+                      {!producto.disponible && producto.stock > 0 && (
+                        <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Temporalmente no disponible
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4">
+                      <button
+                        onClick={() => handleAgregarProducto(producto)}
+                        disabled={!producto.disponible || producto.stock <= 0}
+                        className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Agregar
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

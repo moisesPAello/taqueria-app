@@ -26,18 +26,25 @@ const fetchWithAuth = async (
       headers
     });
     
-    // Si la respuesta no es exitosa, lanzar error
+    // Si la respuesta no es exitosa, intentar obtener el mensaje de error
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
+      const error = new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      (error as any).response = { status: response.status, data: errorData };
+      throw error;
     }
     
-    // Intentar parsear la respuesta como JSON
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error en API:', error);
-    throw error;
+    // Si la respuesta está vacía, retornar null
+    if (response.status === 204) {
+      return null;
+    }
+    
+    return await response.json();
+  } catch (err) {
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error('Error en la petición');
   }
 };
 
@@ -165,8 +172,8 @@ export const productosService = {
 // Servicio de órdenes
 export const ordenesService = {
   // Obtener todas las órdenes
-  getAll: async () => {
-    return fetchWithAuth('/ordenes');
+  getAll: async (params?: URLSearchParams) => {
+    return fetchWithAuth(`/ordenes${params ? `?${params}` : ''}`);
   },
   
   // Obtener órdenes activas

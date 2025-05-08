@@ -2,14 +2,18 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../../config/database');
 
-// Obtener órdenes activas
+// Obtener órdenes con filtros
 router.get('/', (req, res) => {
-    const query = `
+    const { estado, fecha_inicio, fecha_fin } = req.query;
+    
+    let query = `
         SELECT 
             o.id,
             o.total,
             o.estado,
             o.fecha_creacion as hora,
+            o.fecha_cierre,
+            o.metodo_pago,
             json_object('numero', m.numero) as mesa,
             u.nombre as mesero,
             COUNT(d.id) as productos
@@ -17,23 +21,39 @@ router.get('/', (req, res) => {
         LEFT JOIN mesas m ON o.mesa_id = m.id
         LEFT JOIN usuarios u ON o.usuario_id = u.id
         LEFT JOIN detalles_orden d ON o.id = d.orden_id
-        WHERE o.estado = 'activa'
-        GROUP BY o.id
+        WHERE 1=1
     `;
+    
+    const params = [];
+    
+    if (estado) {
+        query += ' AND o.estado = ?';
+        params.push(estado);
+    }
+    
+    if (fecha_inicio) {
+        query += ' AND DATE(o.fecha_creacion) >= DATE(?)';
+        params.push(fecha_inicio);
+    }
+    
+    if (fecha_fin) {
+        query += ' AND DATE(o.fecha_creacion) <= DATE(?)';
+        params.push(fecha_fin);
+    }
+    
+    query += ' GROUP BY o.id ORDER BY o.fecha_creacion DESC';
 
-    db.all(query, [], (err, rows) => {
+    db.all(query, params, (err, rows) => {
         if (err) {
             console.error('Error en la consulta:', err);
             res.status(500).json({ error: err.message });
             return;
         }
 
-        // Log para debug
-        console.log('Órdenes encontradas:', rows);
-
         const formattedRows = rows.map(row => ({
             ...row,
             hora: new Date(row.hora).toLocaleTimeString(),
+            fecha_cierre: row.fecha_cierre ? new Date(row.fecha_cierre).toLocaleTimeString() : null,
             total: parseFloat(row.total).toFixed(2),
             mesa: JSON.parse(row.mesa)
         }));
@@ -227,7 +247,7 @@ router.post('/:id/pagar', (req, res) => {
 
         try {
             db.run(
-                'UPDATE ordenes SET estado = "cerrada", metodo_pago = ?, notas = ?, fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
+                'UPDATE ordenes SET estado = "pagada", metodo_pago = ?, notas = ?, fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
                 [metodo_pago, notas || null, id],
                 function(err) {
                     if (err) {
@@ -235,7 +255,7 @@ router.post('/:id/pagar', (req, res) => {
                         return res.status(500).json({ error: err.message });
                     }
 
-                    // Liberar la mesa
+                    // Liberar la mesa ya que la orden está pagada
                     db.run(
                         `UPDATE mesas 
                         SET estado = "disponible" 

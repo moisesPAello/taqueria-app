@@ -10,6 +10,7 @@ import CrearOrden from './components/features/ordenes/CrearOrden';
 import OrdenesList from './components/features/ordenes/OrdenesList';
 import Dashboard from './components/features/Dashboard';
 import OrdenDetalles from './components/features/ordenes/OrdenDetalles';
+import OrdenesAdmin from './components/features/ordenes/OrdenesAdmin';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation(); // Obtiene la ruta actual
@@ -151,6 +152,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <OrdenDetalles />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/ordenes"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Layout>
+                  <OrdenesAdmin />
                 </Layout>
               </ProtectedRoute>
             }
