@@ -40,7 +40,7 @@ const Login: React.FC = () => {
     if (!formData.password) {
       newErrors.password = 'La contraseña es requerida';
     } else if (formData.password.length < 6) {
-      newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
+      newErrors.password = 'Escribe una buena contraseña >:(';
     }
 
     setErrors(newErrors);
@@ -88,17 +88,18 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 py-12 px-4 sm:px-6 lg:px-8"> Fondo lado izquierdo
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#FBFDFB' }}>  {/* CSS del fondo izquierdo del login*/}
+
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">    {/* CSS del primer texto*/}
             Iniciar Sesión
           </h2>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {errors.general && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert"> {/* CSS del recuadro de inicio de sesion fallido*/}
               <span className="block sm:inline">{errors.general}</span>
             </div>
           )}
@@ -158,7 +159,7 @@ const Login: React.FC = () => {
           </div>
 
           <div>
-            <button
+            <button   /* Botón de inicio sesion*/
               type="submit"
               disabled={isSubmitting}
               className={`group relative w-full flex justify-center py-2 px-4 border border-transparent 

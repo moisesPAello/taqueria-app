@@ -69,11 +69,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </div>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <span className="text-gray-700 mr-4">{user?.nombre}</span>
+                <span className="text-black font-bold mr-4">{user?.nombre}</span>  {/* CSS del tipo de usuario con el que entraste Administrador, Mesero1, Mesero2  */}
               <button
                 onClick={handleLogout}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-md text-sm font-medium"
-              >
+                className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-md text-sm font-medium mr-4 ">
                 Cerrar Sesión
               </button>
             </div>
