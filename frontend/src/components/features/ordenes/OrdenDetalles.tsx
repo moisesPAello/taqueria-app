@@ -219,50 +219,44 @@ const OrdenDetalles: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Información general */}
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-lg font-semibold mb-4">Información General</h2>
             <div className="space-y-3">
               <p className="flex justify-between">
-                <span className="text-gray-600">Mesa:</span>
-                <span className="font-medium">#{orden.mesa_numero}</span>
-              </p>
-              <p className="flex justify-between">
-                <span className="text-gray-600">Mesero:</span>
-                <span className="font-medium">{orden.mesero_nombre || 'No asignado'}</span>
-              </p>
-              <p className="flex justify-between">
                 <span className="text-gray-600">Estado:</span>
-                <span className={`inline-block px-2 py-1 text-sm rounded-full ${
-                  orden.estado === 'activa' 
-                    ? 'bg-green-100 text-green-800' 
-                    : orden.estado === 'cerrada'
-                      ? 'bg-gray-100 text-gray-800'
-                      : 'bg-red-100 text-red-800'
-                } font-medium`}>
+                <span className={`font-medium ${
+                  orden.estado === 'pagada' ? 'text-green-600' :
+                  orden.estado === 'activa' ? 'text-blue-600' :
+                  orden.estado === 'cancelada' ? 'text-red-600' :
+                  'text-gray-600'
+                }`}>
                   {orden.estado.charAt(0).toUpperCase() + orden.estado.slice(1)}
                 </span>
               </p>
               <p className="flex justify-between">
-                <span className="text-gray-600">Personas:</span>
-                <span className="font-medium">{orden.num_personas}</span>
+                <span className="text-gray-600">Mesa:</span>
+                <span className="font-medium">{orden.mesa_numero}</span>
+              </p>
+              <p className="flex justify-between">
+                <span className="text-gray-600">Mesero:</span>
+                <span className="font-medium">{orden.mesero_nombre}</span>
               </p>
               <p className="flex justify-between">
                 <span className="text-gray-600">Hora:</span>
                 <span className="font-medium">{hora}</span>
               </p>
-              {orden.metodo_pago && (
-                <p className="flex justify-between">
-                  <span className="text-gray-600">Método de pago:</span>
-                  <span className="font-medium capitalize">{orden.metodo_pago}</span>
-                </p>
-              )}
-              {orden.notas && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 text-sm font-medium mb-1">Notas generales:</p>
-                  <p className="text-sm">{orden.notas}</p>
-                </div>
+              {orden.estado === 'pagada' && (
+                <>
+                  <p className="flex justify-between">
+                    <span className="text-gray-600">Método de pago:</span>
+                    <span className="font-medium">{orden.metodo_pago}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-gray-600">Fecha de pago:</span>
+                    <span className="font-medium">{formatearHora(orden.fecha_cierre || '')}</span>
+                  </p>
+                </>
               )}
             </div>
           </div>
