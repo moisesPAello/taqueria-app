@@ -142,7 +142,7 @@ const ProductosList: React.FC = () => {
               onChange={(e) => setCategoriaFiltro(e.target.value)}
               className="border border-gray-300 rounded-md px-3 py-2"
             >
-              <option value="">Todas las categorías</option>
+              <option value="">Todas las categorías</option> 
               {categorias.map(categoria => (
                 <option key={categoria} value={categoria}>
                   {categoria}
@@ -171,15 +171,15 @@ const ProductosList: React.FC = () => {
         {/* Resumen de inventario */}
         {user?.rol === 'admin' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"> {/*Total de productos */}
               <h3 className="text-sm font-medium text-gray-500">Total Productos</h3>
               <p className="text-2xl font-bold text-gray-900">{productos.length}</p>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-yellow-200 bg-yellow-50">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-yellow-200 bg-yellow-50">  {/*Stock bajo*/}
               <h3 className="text-sm font-medium text-yellow-800">Stock Bajo</h3>
               <p className="text-2xl font-bold text-yellow-900">{productosStockBajo}</p>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-red-200 bg-red-50">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-red-200 bg-red-50"> {/*Agotados*/}
               <h3 className="text-sm font-medium text-red-800">Agotados</h3>
               <p className="text-2xl font-bold text-red-900">{productosAgotados}</p>
             </div>
