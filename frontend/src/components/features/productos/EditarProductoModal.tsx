@@ -78,12 +78,12 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"> {/*CSS del recuadro completo de Editar Producto*/ }
       <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-semibold mb-4">Editar Producto</h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div> {/* CSS del nombre del producto */}
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre
             </label>
@@ -93,7 +93,7 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
               onChange={(e) => handleInputChange('nombre', e.target.value)}
               className={`w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
                 errors.nombre ? 'border-red-500' : ''
-              }`}
+              } p-2`}
               required
             />
             {errors.nombre && (
@@ -101,20 +101,21 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div>  {/* CSS de la descripción del producto */}
+            <label className="block text-sm font-medium text-gray-700 mb-1"> 
               Descripción
             </label>
             <textarea
               value={formData.descripcion || ''}
               onChange={(e) => handleInputChange('descripcion', e.target.value)}
-              className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2"
               rows={3}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div className="grid grid-cols-2 gap-4"> 
+
+            <div> {/* CSS del precio */}
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Precio
               </label>
@@ -126,7 +127,7 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
                 onChange={(e) => handleInputChange('precio', parseFloat(e.target.value))}
                 className={`w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
                   errors.precio ? 'border-red-500' : ''
-                }`}
+                } p-2`}
                 required
               />
               {errors.precio && (
@@ -134,7 +135,7 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
               )}
             </div>
 
-            <div>
+            <div> {/* CSS de la categoria */}
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Categoría
               </label>
@@ -143,7 +144,7 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
                 onChange={(e) => handleInputChange('categoria', e.target.value)}
                 className={`w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
                   errors.categoria ? 'border-red-500' : ''
-                }`}
+                } p-2`}
                 required
               >
                 <option value="">Seleccionar categoría</option>
@@ -157,7 +158,7 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
             </div>
           </div>
 
-          <div>
+          <div> {/* CSS del stock */}
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Stock Mínimo
             </label>
@@ -168,7 +169,7 @@ const EditarProductoModal: React.FC<EditarProductoModalProps> = ({
               onChange={(e) => handleInputChange('stock_minimo', parseInt(e.target.value))}
               className={`w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
                 errors.stock_minimo ? 'border-red-500' : ''
-              }`}
+              } p-2`}
               required
             />
             {errors.stock_minimo && (
