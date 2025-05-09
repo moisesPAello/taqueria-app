@@ -12,8 +12,10 @@ sqlite3.Database.prototype.runAsync = function(sql, params) {
 };
 
 // Asegurar que las fechas se almacenen en UTC
+const dbPath = path.resolve(__dirname, '../../database/database.db');
+console.log('Database path:', dbPath);
 const db = new sqlite3.Database(
-    path.join(__dirname, '../../database/database.db'),
+    dbPath,
     sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE,
     (err) => {
         if (err) {

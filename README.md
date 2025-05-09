@@ -31,36 +31,25 @@ Desarrollar un sistema gráfico y responsivo para la gestión operativa y admini
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📂 Estructura del Proyecto
+
+El proyecto está organizado de la siguiente manera:
 
 ```
-taqueria-app/
-├── frontend/           # Interfaz de usuario (React + TypeScript + Vite)
-│   └── src/
-│       ├── components/    # Elementos reutilizables
-│       │   ├── common/    # Componentes base
-│       │   ├── features/  # Componentes específicos por feature
-│       │   └── layout/    # Componentes de estructura
-│       ├── context/      # Contextos de React (Auth, etc.)
-│       ├── hooks/        # Custom hooks
-│       ├── pages/        # Vistas principales
-│       ├── services/     # Comunicación con API
-│       ├── types/        # Definiciones de TypeScript
-│       └── utils/        # Utilidades y helpers
-│
-├── backend/            # Lógica del servidor (Node.js + Express)
-│   └── src/
-│       ├── api/         # Endpoints por versión
-│       ├── controllers/ # Lógica de negocio
-│       ├── models/      # Definición de modelos
-│       ├── services/    # Servicios de negocio
-│       ├── middleware/  # Autenticación, validaciones
-│       └── validators/  # Validación de datos
-│
-├── database/           # Base de datos SQLite
-│   ├── migrations/     # Scripts para crear/modificar tablas
-│   ├── seeds/         # Datos de prueba
-│   └── backups/       # Respaldos automáticos
+backend/
+  config/         # Configuración del servidor y base de datos
+  seeds/          # Scripts para inicializar datos
+  src/            # Código fuente del backend
+    api/v1/       # Endpoints de la API
+    controllers/  # Controladores de lógica de negocio
+    models/       # Modelos de datos
+    utils/        # Utilidades compartidas
+frontend/
+  src/            # Código fuente del frontend
+    components/   # Componentes reutilizables
+    pages/        # Páginas principales
+    services/     # Servicios para consumir la API
+    utils/        # Utilidades compartidas
 ```
 
 ---
@@ -126,30 +115,38 @@ npm run dev
 
 ---
 
-## 🗄️ Sistema de Respaldos
+## 🚀 Instalación
 
-El sistema incluye un mecanismo automático de respaldos de la base de datos:
-- Ubicación: `/database/backups/`
-- Formato: `database_backup_YYYYMMDD.db`
-- Frecuencia: Diaria
-- Retención: 30 días
+Sigue estos pasos para configurar el proyecto en tu máquina local:
 
-## 🔄 Migraciones Recientes
+1. Clona el repositorio:
+   ```bash
+   git clone https://github.com/usuario/taqueria-app.git
+   cd taqueria-app
+   ```
 
-- `20250505_add_num_personas`: Añade soporte para número de personas por mesa
-- Más detalles en `/database/migrations/`
+2. Instala las dependencias del backend:
+   ```bash
+   cd backend
+   npm install
+   ```
+
+3. Instala las dependencias del frontend:
+   ```bash
+   cd ../frontend
+   npm install
+   ```
+
+4. Configura la base de datos:
+   - Asegúrate de que SQLite esté instalado.
+   - Ejecuta las migraciones necesarias desde la carpeta `database/migrations/`.
 
 ---
 
-## 🧑‍💻 Autor
+## 🖥️ Uso
 
-Moisés Pérez Aello  
-Proyecto académico para la materia de Sistemas de Información
+### Desarrollo
 
----
-
-## 🧠 Notas Finales
-
-- Este sistema está pensado para ejecutarse localmente (modo desarrollo).
-- El enfoque es educativo, pero la arquitectura está lista para escalar.
+1. Inicia el backend:
+   ```bash
 - El diseño y flujo de trabajo han sido pensados para ser simples, prácticos y realistas.

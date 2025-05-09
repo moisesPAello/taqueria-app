@@ -18,7 +18,7 @@ export interface ProductoOrden {
 
 export interface OrdenRequest {
     mesa_id: number;
-    mesero_id: number;
+    usuario_id: number;
     productos: Array<{
         producto_id: number;
         cantidad: number;
@@ -53,6 +53,7 @@ export interface OrdenResponse {
         numero: number;
     };
     mesero: string;
+    mesero_nombre?: string;  // Added for backward compatibility
     total: string;
     productos: ProductoEnOrden[];
     hora: string;
