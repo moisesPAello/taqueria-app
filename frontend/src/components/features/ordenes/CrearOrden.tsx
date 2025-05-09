@@ -150,7 +150,7 @@ const CrearOrden: React.FC = () => {
       setLoading(true);
       await ordenesService.create({
         mesa_id: state.mesaId,
-        usuario_id: state.meseroId,
+        mesero_id: state.meseroId,
         productos: productosSeleccionados.map(p => ({
           producto_id: p.producto.id,
           cantidad: p.cantidad,

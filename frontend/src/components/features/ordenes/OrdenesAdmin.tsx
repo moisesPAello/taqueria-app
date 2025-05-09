@@ -102,18 +102,8 @@ export default function OrdenesAdmin() {
       setOrdenesActivas(data.filter((orden: OrdenResponse) => orden.estado === 'activa'));
       setOrdenesNoActivas(data.filter((orden: OrdenResponse) => orden.estado !== 'activa'));
       
-    if (id) {
+      if (id) {
         const ordenDetalle = await ordenesService.getById(Number(id));
-        // Ensure we don't duplicate the productos array
-        if (ordenDetalle && ordenDetalle.productos) {
-          // Remove any potential duplicates by product ID
-          const uniqueProductos = ordenDetalle.productos.reduce((acc: any[], curr: any) => {
-            const exists = acc.find(p => p.id === curr.id);
-            if (!exists) acc.push(curr);
-            return acc;
-          }, []);
-          ordenDetalle.productos = uniqueProductos;
-        }
         setOrdenSeleccionada(ordenDetalle);
       }
       

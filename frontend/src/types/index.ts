@@ -18,7 +18,7 @@ export interface ProductoOrden {
 
 export interface OrdenRequest {
     mesa_id: number;
-    usuario_id: number;
+    mesero_id: number;
     productos: Array<{
         producto_id: number;
         cantidad: number;
