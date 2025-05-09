@@ -233,10 +233,10 @@ export default function OrdenesAdmin() {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('activas')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-4 px-4 border-b-2 font-medium text-sm ${
               activeTab === 'activas'
                 ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-white hover:text-gray-700 hover:border-gray-300'
             }`}
           >
             Órdenes Activas
@@ -246,16 +246,16 @@ export default function OrdenesAdmin() {
               </span>
             )}
           </button>
-          <button
+            <button
             onClick={() => setActiveTab('historial')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+            className={`py-4 px-4 border-b-2 font-medium text-sm ${
               activeTab === 'historial'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-indigo-500 text-indigo-600'
+              : 'border-transparent text-white hover:text-gray-700 hover:border-gray-300'
             }`}
-          >
+            >
             Historial
-          </button>
+            </button>
         </nav>
       </div>
 
