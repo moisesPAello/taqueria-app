@@ -89,6 +89,7 @@ const Login: React.FC = () => {
   };
 
   return (
+
     <div className="login-container">
       <div className="max-w-md w-full space-y-8">
         <h2 className="login-title">Iniciar Sesión</h2>
@@ -96,7 +97,7 @@ const Login: React.FC = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {errors.general && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert"> {/* CSS del recuadro de inicio de sesion fallido*/}
-              <span className="block sm:inline">{errors.general}</span>
+              <span className="none sm:inline">{errors.general}</span>
             </div>
           )}
           
@@ -184,6 +185,8 @@ const Login: React.FC = () => {
         </form>
       </div>
     </div>
+
+    
   );
 };
 

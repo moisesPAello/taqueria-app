@@ -62,4 +62,6 @@ export interface OrdenResponse {
     fecha_cierre?: string;
     fecha_creacion?: string;
     num_personas?: number;
+    mesero_nombre?: string;
+
 }

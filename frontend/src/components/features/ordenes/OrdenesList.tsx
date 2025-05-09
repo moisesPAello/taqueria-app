@@ -129,7 +129,11 @@ const OrdenesList: React.FC = () => {
                   <h2 className="text-xl font-semibold mb-2">Orden #{orden.id}</h2>
                   <p className="text-gray-600">Mesa: {orden.mesa.numero}</p>
                   <p className="text-gray-600">Mesero: {orden.mesero_nombre}</p>
-                  <p className="text-gray-600">Productos: {orden.productos}</p>
+                  <p className="text-gray-600">
+                    Productos: {orden.productos.map((producto, index) => (
+                      <span key={index}>{producto.nombre}{index < orden.productos.length - 1 ? ', ' : ''}</span>
+                    ))}
+                  </p>
                   <p className="text-gray-600">Hora: {formatearHora(orden.hora)}</p>
                   {orden.notas && (
                     <p className="mt-2 text-sm text-gray-500 italic">Notas: {orden.notas}</p>
