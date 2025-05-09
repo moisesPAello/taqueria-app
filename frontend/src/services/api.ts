@@ -1,7 +1,5 @@
 import { OrdenRequest, OrdenPagoRequest } from '../types';
-
-// Obtener la URL base de la API desde variables de entorno
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { API_URL } from './config';
 
 // Función para realizar peticiones con token de autenticación
 const fetchWithAuth = async (
@@ -10,26 +8,47 @@ const fetchWithAuth = async (
 ): Promise<any> => {
   const token = localStorage.getItem('token');
   
+  if (!token) {
+    throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
+  }
+  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
     ...options.headers,
   };
-  
+
+  const requestUrl = `${API_URL}${endpoint}`;
+  console.log(`[API Request] ${options.method || 'GET'} ${requestUrl}`);
   // Añadir token de autenticación si existe
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-  }
-  
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+  }    try {
+    const response = await fetch(requestUrl, {
       ...options,
-      headers
+      headers,
+      credentials: 'include'
+    }).catch(error => {
+      console.error('[API Error] Network error:', error);
+      if (!navigator.onLine) {
+        throw new Error('No hay conexión a internet. Por favor, verifica tu conexión.');
+      }
+      throw new Error('No se pudo conectar con el servidor. Verifica que el servidor esté activo.');
     });
     
     // Si la respuesta no es exitosa, intentar obtener el mensaje de error
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const error = new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      console.error('Error de respuesta:', {
+        status: response.status,
+        endpoint,
+        errorData
+      });
+      const error = new Error(
+        errorData.error || 
+        errorData.message || 
+        `Error del servidor (${response.status}): ${response.statusText}`
+      );
       (error as any).response = { status: response.status, data: errorData };
       throw error;
     }
@@ -39,12 +58,17 @@ const fetchWithAuth = async (
       return null;
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log(`Respuesta exitosa de ${endpoint}:`, { status: response.status });
+    return data;
   } catch (err) {
     if (err instanceof Error) {
-      throw err;
+      // Agregar contexto al error
+      const enhancedError = new Error(`Error en ${endpoint}: ${err.message}`);
+      enhancedError.stack = err.stack;
+      throw enhancedError;
     }
-    throw new Error('Error en la petición');
+    throw new Error(`Error inesperado en la petición a ${endpoint}`);
   }
 };
 

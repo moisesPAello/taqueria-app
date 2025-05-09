@@ -53,6 +53,7 @@ export interface OrdenResponse {
         numero: number;
     };
     mesero: string;
+    mesero_nombre?: string;  // Added for backward compatibility
     total: string;
     productos: ProductoEnOrden[];
     hora: string;
