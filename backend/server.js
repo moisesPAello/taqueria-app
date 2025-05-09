@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const db = require('./config/database');
-const initializeData = require('./config/init-data');
+const initializeData = require('./seeds/init-data');
 
 // Importar rutas
 const mesasRoutes = require('./src/api/v1/mesas');
@@ -9,7 +9,7 @@ const productosRoutes = require('./src/api/v1/productos');
 const ordenesRoutes = require('./src/api/v1/ordenes');
 const authRoutes = require('./src/api/v1/auth');
 const usuariosRoutes = require('./src/api/v1/usuarios');
-const dashboardRoutes = require('./src/api/v1/dashboard');
+const dashboardRoutes = require('./src/api/v1/dashboard_feature');
 
 const app = express();
 const PORT = 3000;

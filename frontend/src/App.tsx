@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/features/auth/Login';
 import Register from './components/features/auth/Register';
 import ProtectedRoute from './components/features/auth/ProtectedRoute';
-import MesasList from './components/features/mesas/MesasList';
+import { MesasList } from './components/features/mesas';
 import ProductosList from './components/features/productos/ProductosList';
 import CrearOrden from './components/features/ordenes/CrearOrden';
 import Dashboard from './components/features/Dashboard';

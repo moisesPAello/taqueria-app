@@ -26,9 +26,19 @@ yarn-error.log*
 *.db
 *.sqlite
 *.sqlite3
+# Ignore machine-specific database files
+database-DESKTOP-CIOF5RK.db
+package-DESKTOP-CIOF5RK.json
+
+# Ignore temporary SQL files
+tmp_create_table.sql
+
+# Exclude backups
+backups/
+exports/
 
 # IDE
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
