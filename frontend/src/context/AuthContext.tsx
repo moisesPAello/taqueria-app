@@ -5,7 +5,6 @@ interface User {
   nombre: string;
   rol: string;
   usuario: string;
-  ultimo_acceso?: string;
 }
 
 interface AuthContextType {

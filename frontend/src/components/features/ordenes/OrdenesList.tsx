@@ -31,96 +31,29 @@ const OrdenesList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [ordenes, setOrdenes] = useState<OrdenResponse[]>([]);
   const [ordenParaCancelar, setOrdenParaCancelar] = useState<number | null>(null);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);  const [retryCount, setRetryCount] = useState(0);
-  const [lastError, setLastError] = useState<Date | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const { token } = useAuth();
-
-  const handleError = (err: unknown) => {
-    console.error('Error al cargar órdenes:', err);
-    setLastError(new Date());
-    
-    if (err instanceof Error) {
-      const errorMessage = err.message.toLowerCase();
-      
-      // Manejar diferentes tipos de errores
-      if (errorMessage.includes('no se pudo conectar') || errorMessage.includes('network error') || errorMessage.includes('failed to fetch')) {
-        setError('No se pudo conectar con el servidor. Por favor verifica:\n1. Que el servidor esté activo\n2. Tu conexión a internet\n3. No haya problemas con el firewall\n\nReintentando conexión automáticamente...');
-        
-        // Intentar reconectar si no hemos excedido el límite de intentos
-        if (retryCount < 3) {
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-            cargarOrdenes();
-          }, 5000);
-        }
-      } else if (errorMessage.includes('401') || errorMessage.includes('no autorizado')) {
-        setError('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else if (errorMessage.includes('403')) {
-        setError('No tienes permiso para acceder a las órdenes.');
-      } else if (errorMessage.includes('404')) {
-        setError('El servicio de órdenes no está disponible en este momento.');
-      } else if (errorMessage.includes('500')) {
-        setError('Error interno del servidor. Por favor, intenta más tarde.');
-      } else {
-        setError(`Error al cargar órdenes: ${err.message}`);
-      }
-    } else {
-      setError('Ocurrió un error inesperado al cargar las órdenes');
-    }
-  };
 
   const cargarOrdenes = async () => {
     try {
       setLoading(true);
-      setError(null);
-      
-      if (!token) {
-        console.error('No hay token de autenticación');
-        navigate('/login');
-        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
-      }
-
-      console.log('Cargando órdenes activas...');
       const data = await ordenesService.getActivas();
-      
-      console.log('Respuesta del servidor:', data);
-      
-      if (!data) {
-        throw new Error('No se recibieron datos del servidor');
-      }
-      
-      if (!Array.isArray(data)) {
-        console.error('Respuesta inesperada:', data);
-        throw new Error('Formato de respuesta inválido del servidor');
-      }
-      
-      setRetryCount(0); // Resetear contador de intentos si la carga fue exitosa
       setOrdenes(data);
+      setError(null);
     } catch (err) {
-      handleError(err);
+      console.error('Error al cargar órdenes:', err);
+      setError(err instanceof Error ? err.message : 'Error al cargar órdenes');
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     cargarOrdenes();
-    // Recargar órdenes cada 30 segundos si no hay errores
-    // o cada 5 segundos si hubo un error de conexión
-    const interval = setInterval(() => {
-      const now = new Date();
-      const shouldRetryQuickly = lastError && 
-        (now.getTime() - lastError.getTime() < 30000) && 
-        retryCount < 6;
-
-      if (!error || shouldRetryQuickly) {
-        cargarOrdenes();
-      }
-    }, error ? 5000 : 30000);
-
+    // Recargar órdenes cada 30 segundos
+    const interval = setInterval(cargarOrdenes, 30000);
     return () => clearInterval(interval);
-  }, [token, error, lastError, retryCount]);
+  }, [token]);
 
   const mostrarNotificacion = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -179,31 +112,20 @@ const OrdenesList: React.FC = () => {
         }`}>
           {notification.message}
         </div>
-      )}      {loading && !ordenes.length ? (
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-          <p className="text-gray-600">Cargando órdenes...</p>
+      )}
+
+      {loading && !ordenes.length ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
       ) : error ? (
-        <div className="bg-red-100 text-red-700 p-6 rounded-lg">
-          <div className="flex items-center mb-4">
-            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938-9L12 4.062l6.938 6.938M19 12a7 7 0 01-14 0" />
-            </svg>
-            <span className="font-medium">Error de conexión</span>
-          </div>
-          <p className="whitespace-pre-line">{error}</p>
-          {retryCount > 0 && (
-            <p className="mt-2 text-sm">
-              Intentos de reconexión: {retryCount}
-            </p>
-          )}
-        </div>
+        <div className="bg-red-100 text-red-700 p-4 rounded-lg">{error}</div>
       ) : (
         <div className="grid gap-4">
           {ordenes.map((orden) => (
             <div key={orden.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="flex justify-between items-start">                <div>
+              <div className="flex justify-between items-start">
+                <div>
                   <h2 className="text-xl font-semibold mb-2">Orden #{orden.id}</h2>
                   <p className="text-gray-600">Mesa: {orden.mesa.numero}</p>
                   <p className="text-gray-600">Mesero: {orden.mesero_nombre}</p>
