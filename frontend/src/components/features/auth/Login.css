@@ -17,10 +17,10 @@
 }
 
 body{
-  background-color: #ffffff; /* Color de fondo para las áreas no cubiertas */
-  background-image: url('taco.gif');
+  background-color: #F8FBFF; /* Color de fondo para las áreas no cubiertas */
+  background-image: url('takosu.png');
   background-position: center;
   background-repeat: no-repeat;
-  background-size:0600px; /* Reducir el tamaño de la imagen  */
+  background-size:300px; /* Reducir el tamaño de la imagen  */
   
 }
