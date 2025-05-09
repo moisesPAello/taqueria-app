@@ -72,7 +72,8 @@ const MesaCard: React.FC<MesaCardProps> = ({
       state: { 
         mesaId: mesa.id, 
         mesaNumero: mesa.numero,
-        meseroId: mesa.mesero_id
+        meseroId: mesa.mesero_id,
+        capacidad: mesa.capacidad
       }
     });
   };

@@ -1,17 +1,71 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ordenesService } from '../../../services/api';
-import type { OrdenResponse } from '../../../types';
 import { formatearHora } from '../../../utils/dateUtils';
+
+const ITEMS_PER_PAGE = 10;
 
 type SortDirection = 'asc' | 'desc';
 type SortField = 'id' | 'mesa' | 'estado' | 'total' | 'mesero' | 'metodo_pago' | 'hora' | 'fecha_cierre';
 type MetodoPago = 'efectivo' | 'tarjeta' | 'transferencia';
 
+interface Mesa {
+  id: number;
+  numero: number;
+}
+
+interface Producto {
+  id: number;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  notas?: string;
+}
+
+interface OrdenResponse {
+  id: number;
+  mesa: Mesa;
+  estado: string;
+  total: number;
+  mesero: string;
+  hora: string;
+  fecha_cierre?: string;
+  notas?: string;
+  num_personas?: number;
+  productos?: Producto[];
+  metodo_pago?: MetodoPago;
+  pagos_divididos?: Array<{
+    cliente_numero: number;
+    monto: number;
+    metodo_pago: MetodoPago;
+  }>;
+}
+
 interface PagoCliente {
   cliente_numero: number;
   monto: number;
   metodo_pago?: MetodoPago;
+}
+
+// Add interfaces for component props
+interface PaginationButtonProps {
+  page: number;
+  current: number;
+  onClick: () => void;
+}
+
+interface SortArrowProps {
+  field: string;
+  currentField: string;
+  direction: SortDirection;
+}
+
+interface PaymentMethodButtonProps {
+  method: MetodoPago;
+  selected: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
 }
 
 export default function OrdenesAdmin() {
@@ -35,6 +89,10 @@ export default function OrdenesAdmin() {
   const [notas, setNotas] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [estadoFiltro, setEstadoFiltro] = useState('');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   const cargarOrdenes = async () => {
     try {
@@ -104,8 +162,20 @@ export default function OrdenesAdmin() {
       );
     }
 
+    if (estadoFiltro) {
+      resultado = resultado.filter(orden => orden.estado === estadoFiltro);
+    }
+
+    if (fechaDesde) {
+      resultado = resultado.filter(orden => new Date(orden.hora) >= new Date(fechaDesde));
+    }
+
+    if (fechaHasta) {
+      resultado = resultado.filter(orden => new Date(orden.hora) <= new Date(fechaHasta));
+    }
+
     return resultado;
-  }, [searchTerm]);
+  }, [searchTerm, estadoFiltro, fechaDesde, fechaHasta]);
 
   useEffect(() => {
     cargarOrdenes();
@@ -121,6 +191,17 @@ export default function OrdenesAdmin() {
 
   const handlePagar = async () => {
     if (!ordenSeleccionada) return;
+    
+    // Validate split payments
+    if (modoPagoDividido) {
+      const totalPagos = pagosDivididos.reduce((sum, p) => sum + p.monto, 0);
+      const difference = Math.abs(totalPagos - Number(ordenSeleccionada.total));
+      
+      if (difference > 0.01) { // Allow for small floating point differences
+        mostrarNotificacion('error', `El total de los pagos (${totalPagos.toFixed(2)}) no coincide con el total de la orden (${ordenSeleccionada.total})`);
+        return;
+      }
+    }
     
     try {
       setLoading(true);
@@ -171,15 +252,47 @@ export default function OrdenesAdmin() {
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'activa':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-amber-100 text-amber-900 border border-amber-200'; // Improved contrast for yellow
       case 'cerrada':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 text-emerald-900 border border-emerald-200';
       case 'cancelada':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-900 border border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-900 border border-gray-200';
     }
   };
+
+  const paginatedOrdenes = ordenesNoActivas.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  
+  const totalPages = Math.ceil(ordenesNoActivas.length / ITEMS_PER_PAGE);
+  
+  const PaginationButton: React.FC<PaginationButtonProps> = ({ page, current, onClick }) => (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 rounded-md text-sm font-medium ${
+        page === current
+          ? 'bg-indigo-600 text-white'
+          : 'text-gray-700 hover:bg-gray-100'
+      }`}
+    >
+      {page}
+    </button>
+  );
+
+  const SortArrow: React.FC<SortArrowProps> = ({ field, currentField, direction }) => (
+    <span className={`inline-flex ml-2 ${field === currentField ? 'opacity-100' : 'opacity-0'}`}>
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {direction === 'asc' ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        )}
+      </svg>
+    </span>
+  );
 
   if (loading) {
     return (
@@ -206,8 +319,11 @@ export default function OrdenesAdmin() {
 
       {/* Filtros y búsqueda */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Buscar
+            </label>
             <input
               type="text"
               placeholder="Buscar por ID, mesa o mesero..."
@@ -216,14 +332,57 @@ export default function OrdenesAdmin() {
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ordenar por
+            </label>
             <select 
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               onChange={(e) => setSortConfig(prev => ({ ...prev, field: e.target.value as SortField }))}
             >
               <option value="hora">Más recientes primero</option>
               <option value="id">Por ID</option>
-              <option value="total">Por total</option>
+              <option value="mesa">Por Mesa</option>
+              <option value="estado">Por Estado</option>
+              <option value="total">Por Total</option>
+              <option value="mesero">Por Mesero</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Estado
+            </label>
+            <select 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e) => setEstadoFiltro(e.target.value)}
+            >
+              <option value="">Todos los estados</option>
+              <option value="cerrada">Cerradas</option>
+              <option value="cancelada">Canceladas</option>
+            </select>
+          </div>
+        </div>
+        
+        {/* Date range filter */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha desde
+            </label>
+            <input
+              type="date"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e) => setFechaDesde(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha hasta
+            </label>
+            <input
+              type="date"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e) => setFechaHasta(e.target.value)}
+            />
           </div>
         </div>
       </div>
@@ -315,11 +474,7 @@ export default function OrdenesAdmin() {
                         }))}>
                       <div className="flex items-center">
                         ID
-                        {sortConfig.field === 'id' && (
-                          <span className="ml-2">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
+                        <SortArrow field="id" currentField={sortConfig.field} direction={sortConfig.direction} />
                       </div>
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -329,11 +484,7 @@ export default function OrdenesAdmin() {
                         }))}>
                       <div className="flex items-center">
                         Mesa
-                        {sortConfig.field === 'mesa' && (
-                          <span className="ml-2">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
+                        <SortArrow field="mesa" currentField={sortConfig.field} direction={sortConfig.direction} />
                       </div>
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -343,11 +494,7 @@ export default function OrdenesAdmin() {
                         }))}>
                       <div className="flex items-center">
                         Estado
-                        {sortConfig.field === 'estado' && (
-                          <span className="ml-2">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
+                        <SortArrow field="estado" currentField={sortConfig.field} direction={sortConfig.direction} />
                       </div>
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -357,12 +504,7 @@ export default function OrdenesAdmin() {
                         }))}>
                       <div className="flex items-center">
                         Total
-                        {sortConfig.field === 'total' && (
-                          <span className="ml-2">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'
-                            }
-                          </span>
-                        )}
+                        <SortArrow field="total" currentField={sortConfig.field} direction={sortConfig.direction} />
                       </div>
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -372,17 +514,13 @@ export default function OrdenesAdmin() {
                         }))}>
                       <div className="flex items-center">
                         Fecha
-                        {sortConfig.field === 'hora' && (
-                          <span className="ml-2">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
+                        <SortArrow field="hora" currentField={sortConfig.field} direction={sortConfig.direction} />
                       </div>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {ordenesNoActivas.map((orden) => (
+                  {paginatedOrdenes.map((orden) => (
                     <tr
                       key={orden.id}
                       onClick={() => navigate(`/ordenes/${orden.id}`)}
@@ -407,13 +545,46 @@ export default function OrdenesAdmin() {
                   ))}
                 </tbody>
               </table>
+              
+              {/* Pagination controls */}
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, ordenesNoActivas.length)} de {ordenesNoActivas.length} órdenes
+                  </div>
+                  <div className="space-x-1">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-2 py-1 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Anterior
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <PaginationButton
+                        key={page}
+                        page={page}
+                        current={currentPage}
+                        onClick={() => setCurrentPage(page)}
+                      />
+                    ))}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="px-2 py-1 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
 
         {/* Order details panel */}
         {ordenSeleccionada && (
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 sticky top-4" style={{ maxHeight: 'calc(100vh - 2rem)', overflowY: 'auto' }}>
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex justify-between items-start mb-6">
                 <div>
@@ -502,6 +673,41 @@ export default function OrdenesAdmin() {
                         >
                           Procesar Pago
                         </button>
+                      </div>
+                    )}
+
+                    {/* Payment information for closed orders */}
+                    {ordenSeleccionada.estado === 'cerrada' && (
+                      <div className="mt-6 pt-4 border-t border-gray-200">
+                        <h4 className="text-lg font-semibold mb-3">Información de Pago</h4>
+                        {ordenSeleccionada.pagos_divididos && ordenSeleccionada.pagos_divididos.length > 0 ? (
+                          <div className="space-y-3">
+                            {ordenSeleccionada.pagos_divididos.map((pago, index) => (
+                              <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                <div>
+                                  <p className="font-medium">Cliente {pago.cliente_numero}</p>
+                                  <p className="text-sm text-gray-600">
+                                    {pago.metodo_pago.charAt(0).toUpperCase() + pago.metodo_pago.slice(1)}
+                                  </p>
+                                </div>
+                                <p className="font-bold text-indigo-600">${Number(pago.monto).toFixed(2)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gray-50 rounded-lg">
+                            <div className="flex justify-between items-center">
+                              <p className="font-medium">Pago completo</p>
+                              <p className="font-bold text-indigo-600">${Number(ordenSeleccionada.total).toFixed(2)}</p>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {ordenSeleccionada.metodo_pago ? 
+                                ordenSeleccionada.metodo_pago.charAt(0).toUpperCase() + ordenSeleccionada.metodo_pago.slice(1)
+                                : 'Método no especificado'
+                              }
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -613,39 +819,27 @@ export default function OrdenesAdmin() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
+                    <PaymentMethodButton
+                      method="efectivo"
+                      selected={metodoPago === 'efectivo'}
                       onClick={() => setMetodoPago('efectivo')}
-                      className={`px-4 py-2 rounded-lg border ${
-                        metodoPago === 'efectivo'
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                          : 'border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Efectivo
-                    </button>
-                    <button
-                      type="button"
+                      icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+                      label="Efectivo"
+                    />
+                    <PaymentMethodButton
+                      method="tarjeta"
+                      selected={metodoPago === 'tarjeta'}
                       onClick={() => setMetodoPago('tarjeta')}
-                      className={`px-4 py-2 rounded-lg border ${
-                        metodoPago === 'tarjeta'
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                          : 'border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Tarjeta
-                    </button>
-                    <button
-                      type="button"
+                      icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>}
+                      label="Tarjeta"
+                    />
+                    <PaymentMethodButton
+                      method="transferencia"
+                      selected={metodoPago === 'transferencia'}
                       onClick={() => setMetodoPago('transferencia')}
-                      className={`px-4 py-2 rounded-lg border ${
-                        metodoPago === 'transferencia'
-                          ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
-                          : 'border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      Transferencia
-                    </button>
+                      icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>}
+                      label="Transferencia"
+                    />
                   </div>
                 )}
 
@@ -724,3 +918,18 @@ export default function OrdenesAdmin() {
     </div>
   );
 }
+
+const PaymentMethodButton: React.FC<PaymentMethodButtonProps> = ({ selected, onClick, icon, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+      selected
+        ? 'border-indigo-600 bg-indigo-50 text-indigo-600 ring-2 ring-indigo-200'
+        : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+    }`}
+  >
+    {icon}
+    <span className="font-medium">{label}</span>
+  </button>
+);

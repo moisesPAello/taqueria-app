@@ -17,6 +17,7 @@ import ProductosList from './components/features/productos/ProductosList';
 import CrearOrden from './components/features/ordenes/CrearOrden';
 import Dashboard from './components/features/Dashboard';
 import OrdenesAdmin from './components/features/ordenes/OrdenesAdmin';
+import AdminDashboard from './components/features/admin/AdminDashboard';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
@@ -162,7 +163,7 @@ function App() {
           <Route path="admin" element={
             <ProtectedRoute requiredRole="admin">
               <Layout>
-                <div>Panel de Administración (Próximamente)</div>
+                <AdminDashboard />
               </Layout>
             </ProtectedRoute>
           } />
