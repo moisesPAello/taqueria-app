@@ -97,10 +97,14 @@ class MesaModel {
             db.run(
                 `UPDATE mesas 
                 SET estado = ?,
+                    mesero_id = CASE 
+                        WHEN ? = 'disponible' THEN NULL 
+                        ELSE mesero_id 
+                    END,
                     actualizado_por = ?,
                     fecha_actualizacion = CURRENT_TIMESTAMP
                 WHERE id = ?`,
-                [estado, usuarioActual, mesaId],
+                [estado, estado, usuarioActual, mesaId],
                 function(err) {
                     if (err) return reject(err);
                     resolve({ changes: this.changes });

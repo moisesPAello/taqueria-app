@@ -9,7 +9,7 @@ router.get('/', (req, res) => {
     let query = `
         SELECT 
             o.id,
-            o.total,
+            (SELECT SUM(d2.cantidad * d2.precio_unitario) FROM detalles_orden d2 WHERE d2.orden_id = o.id) as total,
             o.estado,
             o.fecha_creacion as hora,
             o.fecha_cierre,
@@ -67,7 +67,7 @@ router.get('/activas', (req, res) => {
     const query = `
         SELECT 
             o.id,
-            o.total,
+            (SELECT SUM(d2.cantidad * d2.precio_unitario) FROM detalles_orden d2 WHERE d2.orden_id = o.id) as total,
             o.estado,
             o.fecha_creacion as hora,
             m.numero as mesa,
@@ -107,6 +107,7 @@ router.get('/:id', (req, res) => {
             o.*,
             m.numero as mesa_numero,
             u.nombre as mesero_nombre,
+            (SELECT SUM(d2.cantidad * d2.precio_unitario) FROM detalles_orden d2 WHERE d2.orden_id = o.id) as total,
             json_group_array(
                 json_object(
                     'id', p.id,
@@ -115,12 +116,20 @@ router.get('/:id', (req, res) => {
                     'cantidad', d.cantidad,
                     'notas', d.notas
                 )
-            ) as productos
+            ) as productos,
+            json_group_array(
+                DISTINCT json_object(
+                    'cliente_numero', pd.cliente_numero,
+                    'monto', pd.monto,
+                    'metodo_pago', COALESCE(pd.metodo_pago, o.metodo_pago)
+                )
+            ) as pagos_divididos
         FROM ordenes o
         LEFT JOIN mesas m ON o.mesa_id = m.id
         LEFT JOIN usuarios u ON o.usuario_id = u.id
         LEFT JOIN detalles_orden d ON o.id = d.orden_id
         LEFT JOIN productos p ON d.producto_id = p.id
+        LEFT JOIN pagos_divididos pd ON o.id = pd.orden_id
         WHERE o.id = ?
         GROUP BY o.id
     `;
@@ -142,8 +151,11 @@ router.get('/:id', (req, res) => {
             mesa: orden.mesa_numero ? { numero: orden.mesa_numero } : null,
             mesero: orden.mesero_nombre || 'No asignado',
             productos: JSON.parse(orden.productos || '[]').filter(p => p.id !== null),
+            pagos_divididos: orden.estado === 'cerrada' 
+                ? JSON.parse(orden.pagos_divididos || '[]').filter(p => p.cliente_numero !== null)
+                : [],
             hora: orden.fecha_creacion,
-            total: parseFloat(orden.total).toFixed(2)
+            total: parseFloat(orden.total || 0).toFixed(2)
         };
 
         delete formattedOrden.mesa_numero;
@@ -168,114 +180,139 @@ router.post('/', (req, res) => {
         db.run('BEGIN TRANSACTION');
         
         try {
-            // Verificar stock de productos
-            const stockQuery = `
-                SELECT id, nombre, stock, stock_minimo
-                FROM productos 
-                WHERE id IN (${productos.map(() => '?').join(',')})
-            `;
-            
-            db.all(stockQuery, productos.map(p => p.producto_id), (err, productosInfo) => {
-                if (err) {
-                    console.error('Error al verificar stock:', err);
-                    db.run('ROLLBACK');
-                    return res.status(500).json({ error: 'Error al verificar stock de productos' });
-                }
+            // Verificar capacidad de la mesa
+            db.get(
+                'SELECT capacidad FROM mesas WHERE id = ?',
+                [mesa_id],
+                (err, mesa) => {
+                    if (err) {
+                        console.error('Error al verificar capacidad de mesa:', err);
+                        db.run('ROLLBACK');
+                        return res.status(500).json({ error: 'Error al verificar capacidad de mesa' });
+                    }
 
-                // Crear mapa de productos solicitados para fácil acceso
-                const productosMap = new Map(productos.map(p => [p.producto_id, p.cantidad]));
-                
-                // Verificar stock suficiente
-                const stockInsuficiente = productosInfo.find(p => 
-                    (p.stock - (productosMap.get(p.id) || 0)) < 0
-                );
+                    if (!mesa) {
+                        db.run('ROLLBACK');
+                        return res.status(404).json({ error: 'Mesa no encontrada' });
+                    }
 
-                if (stockInsuficiente) {
-                    db.run('ROLLBACK');
-                    return res.status(400).json({ 
-                        error: `Stock insuficiente para: ${stockInsuficiente.nombre}`
+                    if (num_personas > mesa.capacidad) {
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ 
+                            error: `El número de personas (${num_personas}) excede la capacidad de la mesa (${mesa.capacidad})` 
+                        });
+                    }
+
+                    // Verificar stock de productos
+                    const stockQuery = `
+                        SELECT id, nombre, stock, stock_minimo
+                        FROM productos 
+                        WHERE id IN (${productos.map(() => '?').join(',')})
+                    `;
+                    
+                    db.all(stockQuery, productos.map(p => p.producto_id), (err, productosInfo) => {
+                        if (err) {
+                            console.error('Error al verificar stock:', err);
+                            db.run('ROLLBACK');
+                            return res.status(500).json({ error: 'Error al verificar stock de productos' });
+                        }
+
+                        // Crear mapa de productos solicitados para fácil acceso
+                        const productosMap = new Map(productos.map(p => [p.producto_id, p.cantidad]));
+                        
+                        // Verificar stock suficiente
+                        const stockInsuficiente = productosInfo.find(p => 
+                            (p.stock - (productosMap.get(p.id) || 0)) < 0
+                        );
+
+                        if (stockInsuficiente) {
+                            db.run('ROLLBACK');
+                            return res.status(400).json({ 
+                                error: `Stock insuficiente para: ${stockInsuficiente.nombre}`
+                            });
+                        }
+
+                        // 2. Crear la orden
+                        db.run(
+                            'INSERT INTO ordenes (mesa_id, usuario_id, estado, total, num_personas, notas) VALUES (?, ?, "activa", 0, ?, ?)',
+                            [mesa_id, mesero_id, num_personas || 1, notas || ''],
+                            function(err) {
+                                if (err) {
+                                    console.error('Error al crear orden:', err);
+                                    db.run('ROLLBACK');
+                                    return res.status(500).json({ error: err.message });
+                                }
+                                
+                                const orden_id = this.lastID;
+                                
+                                try {
+                                    // 3. Insertar los productos y actualizar stock
+                                    const stmtDetalles = db.prepare(`
+                                        INSERT INTO detalles_orden (
+                                            orden_id, producto_id, cantidad, precio_unitario
+                                        ) VALUES (?, ?, ?, (
+                                            SELECT precio FROM productos WHERE id = ?
+                                        ))
+                                    `);
+                                    
+                                    const stmtStock = db.prepare(`
+                                        UPDATE productos 
+                                        SET stock = stock - ?,
+                                            fecha_actualizacion = CURRENT_TIMESTAMP
+                                        WHERE id = ?
+                                    `);
+                                    
+                                    const stmtMovimiento = db.prepare(`
+                                        INSERT INTO movimientos_inventario (
+                                            producto_id, tipo, cantidad, motivo, 
+                                            orden_id, usuario_id
+                                        ) VALUES (?, 'salida', ?, 'Venta en orden', ?, ?)
+                                    `);
+                                    
+                                    productos.forEach(prod => {
+                                        stmtDetalles.run([orden_id, prod.producto_id, prod.cantidad, prod.producto_id]);
+                                        stmtStock.run([prod.cantidad, prod.producto_id]);
+                                        stmtMovimiento.run([prod.producto_id, prod.cantidad, orden_id, mesero_id]);
+                                    });
+                                    
+                                    stmtDetalles.finalize();
+                                    stmtStock.finalize();
+                                    stmtMovimiento.finalize();
+                                    
+                                    // 4. Actualizar el total de la orden
+                                    db.run(`
+                                        UPDATE ordenes 
+                                        SET total = (
+                                            SELECT SUM(cantidad * precio_unitario) 
+                                            FROM detalles_orden 
+                                            WHERE orden_id = ?
+                                        )
+                                        WHERE id = ?
+                                    `, [orden_id, orden_id]);
+                                    
+                                    // 5. Actualizar estado de la mesa
+                                    db.run(
+                                        'UPDATE mesas SET estado = "ocupada" WHERE id = ?',
+                                        [mesa_id]
+                                    );
+                                    
+                                    // 6. Confirmar transacción
+                                    db.run('COMMIT');
+                                    
+                                    res.json({ 
+                                        message: 'Orden creada exitosamente',
+                                        orden_id 
+                                    });
+                                } catch (err) {
+                                    console.error('Error al procesar productos:', err);
+                                    db.run('ROLLBACK');
+                                    res.status(500).json({ error: err.message });
+                                }
+                            }
+                        );
                     });
                 }
-
-                // 2. Crear la orden
-                db.run(
-                    'INSERT INTO ordenes (mesa_id, usuario_id, estado, total, num_personas, notas) VALUES (?, ?, "activa", 0, ?, ?)',
-                    [mesa_id, mesero_id, num_personas || 1, notas || ''],
-                    function(err) {
-                        if (err) {
-                            console.error('Error al crear orden:', err);
-                            db.run('ROLLBACK');
-                            return res.status(500).json({ error: err.message });
-                        }
-                        
-                        const orden_id = this.lastID;
-                        
-                        try {
-                            // 3. Insertar los productos y actualizar stock
-                            const stmtDetalles = db.prepare(`
-                                INSERT INTO detalles_orden (
-                                    orden_id, producto_id, cantidad, precio_unitario
-                                ) VALUES (?, ?, ?, (
-                                    SELECT precio FROM productos WHERE id = ?
-                                ))
-                            `);
-                            
-                            const stmtStock = db.prepare(`
-                                UPDATE productos 
-                                SET stock = stock - ?,
-                                    fecha_actualizacion = CURRENT_TIMESTAMP
-                                WHERE id = ?
-                            `);
-                            
-                            const stmtMovimiento = db.prepare(`
-                                INSERT INTO movimientos_inventario (
-                                    producto_id, tipo, cantidad, motivo, 
-                                    orden_id, usuario_id
-                                ) VALUES (?, 'salida', ?, 'Venta en orden', ?, ?)
-                            `);
-                            
-                            productos.forEach(prod => {
-                                stmtDetalles.run([orden_id, prod.producto_id, prod.cantidad, prod.producto_id]);
-                                stmtStock.run([prod.cantidad, prod.producto_id]);
-                                stmtMovimiento.run([prod.producto_id, prod.cantidad, orden_id, mesero_id]);
-                            });
-                            
-                            stmtDetalles.finalize();
-                            stmtStock.finalize();
-                            stmtMovimiento.finalize();
-                            
-                            // 4. Actualizar el total de la orden
-                            db.run(`
-                                UPDATE ordenes 
-                                SET total = (
-                                    SELECT SUM(cantidad * precio_unitario) 
-                                    FROM detalles_orden 
-                                    WHERE orden_id = ?
-                                )
-                                WHERE id = ?
-                            `, [orden_id, orden_id]);
-                            
-                            // 5. Actualizar estado de la mesa
-                            db.run(
-                                'UPDATE mesas SET estado = "ocupada" WHERE id = ?',
-                                [mesa_id]
-                            );
-                            
-                            // 6. Confirmar transacción
-                            db.run('COMMIT');
-                            
-                            res.json({ 
-                                message: 'Orden creada exitosamente',
-                                orden_id 
-                            });
-                        } catch (err) {
-                            console.error('Error al procesar productos:', err);
-                            db.run('ROLLBACK');
-                            res.status(500).json({ error: err.message });
-                        }
-                    }
-                );
-            });
+            );
         } catch (err) {
             console.error('Error en la transacción:', err);
             db.run('ROLLBACK');
@@ -289,6 +326,8 @@ router.post('/:id/pagar', (req, res) => {
     const { id } = req.params;
     const { metodo_pago, notas, pagos_divididos } = req.body;
 
+    console.log('Received payment request:', { id, metodo_pago, notas, pagos_divididos });
+
     if (!metodo_pago) {
         return res.status(400).json({ error: 'El método de pago es requerido' });
     }
@@ -299,78 +338,124 @@ router.post('/:id/pagar', (req, res) => {
         try {
             // Verificar que la orden exista y esté activa
             db.get(
-                'SELECT estado, total FROM ordenes WHERE id = ?',
+                `SELECT 
+                    o.estado, 
+                    o.mesa_id,
+                    (SELECT SUM(cantidad * precio_unitario) FROM detalles_orden WHERE orden_id = o.id) as total
+                FROM ordenes o WHERE o.id = ?`,
                 [id],
                 (err, orden) => {
                     if (err) {
+                        console.error('Error querying order:', err);
                         db.run('ROLLBACK');
                         return res.status(500).json({ error: err.message });
                     }
 
                     if (!orden) {
+                        console.log('Order not found:', id);
                         db.run('ROLLBACK');
                         return res.status(404).json({ error: 'Orden no encontrada' });
                     }
 
+                    if (!orden.mesa_id) {
+                        console.log('Order has no table assigned:', id);
+                        db.run('ROLLBACK');
+                        return res.status(400).json({ error: 'La orden no tiene una mesa asignada' });
+                    }
+
                     if (orden.estado !== 'activa') {
+                        console.log('Order is not active:', id, orden.estado);
                         db.run('ROLLBACK');
                         return res.status(400).json({ 
                             error: 'No se puede procesar el pago. La orden no está activa' 
                         });
                     }
 
-                    // Si hay pagos divididos, validar que la suma sea igual al total
-                    if (pagos_divididos && pagos_divididos.length > 0) {
-                        const totalPagos = pagos_divididos.reduce((sum, pago) => sum + pago.monto, 0);
-                        if (Math.abs(totalPagos - orden.total) > 0.01) {
-                            db.run('ROLLBACK');
-                            return res.status(400).json({ 
-                                error: 'La suma de los pagos divididos debe ser igual al total de la orden' 
-                            });
-                        }
-                    }
-
-                    // Procesar el pago
+                    // Update total before processing payment to ensure it's correct
                     db.run(
-                        'UPDATE ordenes SET estado = "cerrada", metodo_pago = ?, notas = ?, fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
-                        [metodo_pago, notas || null, id],
-                        function(err) {
+                        'UPDATE ordenes SET total = ? WHERE id = ?',
+                        [orden.total, id],
+                        (err) => {
                             if (err) {
+                                console.error('Error updating order total:', err);
                                 db.run('ROLLBACK');
                                 return res.status(500).json({ error: err.message });
                             }
 
-                            // Liberar la mesa ya que la orden está pagada
+                            console.log('Processing payment for order:', { 
+                                id, 
+                                estado: orden.estado, 
+                                total: orden.total,
+                                mesa_id: orden.mesa_id,
+                                metodo_pago
+                            });
+
+                            // Si hay pagos divididos, validar que la suma sea igual al total
+                            if (pagos_divididos && pagos_divididos.length > 0) {
+                                const totalPagos = pagos_divididos.reduce((sum, pago) => sum + pago.monto, 0);
+                                if (Math.abs(totalPagos - orden.total) > 0.01) {
+                                    console.log('Split payment total mismatch:', { totalPagos, ordenTotal: orden.total });
+                                    db.run('ROLLBACK');
+                                    return res.status(400).json({ 
+                                        error: 'La suma de los pagos divididos debe ser igual al total de la orden' 
+                                    });
+                                }
+                            }
+
+                            console.log('Processing payment for order:', { 
+                                id, 
+                                estado: orden.estado, 
+                                total: orden.total,
+                                mesa_id: orden.mesa_id,
+                                metodo_pago
+                            });
+
+                            // Procesar el pago
                             db.run(
-                                `UPDATE mesas 
-                                SET estado = "disponible" 
-                                WHERE id = (SELECT mesa_id FROM ordenes WHERE id = ?)`,
-                                [id],
+                                'UPDATE ordenes SET estado = "cerrada", metodo_pago = ?, notas = ?, fecha_cierre = CURRENT_TIMESTAMP WHERE id = ?',
+                                [metodo_pago, notas || null, id],
                                 function(err) {
                                     if (err) {
+                                        console.error('Error updating order status:', err);
                                         db.run('ROLLBACK');
                                         return res.status(500).json({ error: err.message });
                                     }
 
-                                    // Si hay pagos divididos, registrarlos
-                                    if (pagos_divididos && pagos_divididos.length > 0) {
-                                        const stmt = db.prepare(
-                                            'INSERT INTO pagos_divididos (orden_id, cliente_numero, monto, metodo_pago) VALUES (?, ?, ?, ?)'
-                                        );
+                                    // Liberar la mesa ya que la orden está pagada
+                                    db.run(
+                                        'UPDATE mesas SET estado = "disponible", mesero_id = NULL, orden_actual = NULL WHERE id = ?',
+                                        [orden.mesa_id],
+                                        function(err) {
+                                            if (err) {
+                                                console.error('Error updating table status:', err);
+                                                db.run('ROLLBACK');
+                                                return res.status(500).json({ error: err.message });
+                                            }
 
-                                        try {
-                                            pagos_divididos.forEach(pago => {
-                                                stmt.run([id, pago.cliente_numero, pago.monto, pago.metodo_pago || metodo_pago]);
-                                            });
-                                            stmt.finalize();
-                                        } catch (err) {
-                                            db.run('ROLLBACK');
-                                            return res.status(500).json({ error: 'Error al registrar pagos divididos' });
+                                            // Si hay pagos divididos, registrarlos
+                                            if (pagos_divididos && pagos_divididos.length > 0) {
+                                                console.log('Registering split payments:', pagos_divididos);
+                                                const stmt = db.prepare(
+                                                    'INSERT INTO pagos_divididos (orden_id, cliente_numero, monto, metodo_pago) VALUES (?, ?, ?, ?)'
+                                                );
+
+                                                try {
+                                                    pagos_divididos.forEach(pago => {
+                                                        stmt.run([id, pago.cliente_numero, pago.monto, pago.metodo_pago || metodo_pago]);
+                                                    });
+                                                    stmt.finalize();
+                                                } catch (err) {
+                                                    console.error('Error registering split payments:', err);
+                                                    db.run('ROLLBACK');
+                                                    return res.status(500).json({ error: 'Error al registrar pagos divididos' });
+                                                }
+                                            }
+
+                                            console.log('Payment processed successfully for order:', id);
+                                            db.run('COMMIT');
+                                            res.json({ message: 'Orden pagada exitosamente' });
                                         }
-                                    }
-
-                                    db.run('COMMIT');
-                                    res.json({ message: 'Orden pagada exitosamente' });
+                                    );
                                 }
                             );
                         }
@@ -378,6 +463,7 @@ router.post('/:id/pagar', (req, res) => {
                 }
             );
         } catch (err) {
+            console.error('Transaction error:', err);
             db.run('ROLLBACK');
             res.status(500).json({ error: err.message });
         }
@@ -464,9 +550,9 @@ router.post('/:id/cancelar', (req, res) => {
                                         stmtStock.finalize();
                                         stmtMovimiento.finalize();
 
-                                        // Liberar la mesa
+                                        // Liberar la mesa y establecer estado disponible
                                         db.run(
-                                            'UPDATE mesas SET estado = "disponible" WHERE id = ?',
+                                            'UPDATE mesas SET estado = "disponible", mesero_id = NULL, orden_actual = NULL WHERE id = ?',
                                             [orden.mesa_id],
                                             function(err) {
                                                 if (err) {
